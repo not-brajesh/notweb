@@ -1,330 +1,350 @@
 
 /**
- * NOTWEB — SEO Analysis Engine
+ * NOTWEB — SEO Analyzer
  *
- * Analyzes website metadata and reports actionable SEO issues.
- *
- * This module performs local analysis only.
- * It does not fetch websites or guarantee search-engine rankings.
+ * Performs deterministic SEO checks on already-available HTML and metadata.
+ * This module does not fetch websites or execute JavaScript.
  */
 
 import type {
   AnalysisIssue,
+  AnalysisSeverity,
   WebsiteMetadata,
 } from "./index.js";
 
-/* -------------------------------------------------------------------------- */
-/*                                  Options                                   */
-/* -------------------------------------------------------------------------- */
-
-export interface SeoAnalysisOptions {
-  /** Recommended title length upper bound. */
-  maxTitleLength?: number;
-
-  /** Recommended title length lower bound. */
-  minTitleLength?: number;
-
-  /** Recommended description length upper bound. */
-  maxDescriptionLength?: number;
-
-  /** Recommended description length lower bound. */
-  minDescriptionLength?: number;
+export interface SeoAnalysisInput {
+  html: string;
+  metadata: WebsiteMetadata;
+  /** Optional observed HTTP status from a trusted fetching layer. */
+  statusCode?: number;
 }
 
-const DEFAULT_OPTIONS: Required<SeoAnalysisOptions> = {
-  minTitleLength: 30,
-  maxTitleLength: 60,
-  minDescriptionLength: 70,
-  maxDescriptionLength: 160,
-};
+export interface SeoAnalysisResult {
+  score: number;
+  issues: AnalysisIssue[];
+  checksPerformed: number;
+}
 
-/* -------------------------------------------------------------------------- */
-/*                                  Helpers                                   */
-/* -------------------------------------------------------------------------- */
+interface SeoCheck {
+  id: string;
+  title: string;
+  description: string;
+  recommendation: string;
+  severity: AnalysisSeverity;
+  failed: boolean;
+  element?: string;
+  documentationUrl?: string;
+}
 
-function createIssue(
-  issue: Omit<AnalysisIssue, "id">,
-): AnalysisIssue {
+function countMatches(html: string, expression: RegExp): number {
+  return [...html.matchAll(expression)].length;
+}
+
+function getTagAttributes(tag: string): string {
+  return tag.replace(/^<\w+\b/i, "").replace(/\/?>$/, "");
+}
+
+function getAttribute(
+  attributes: string,
+  attributeName: string,
+): string | undefined {
+  const escapedName = attributeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const expression = new RegExp(
+    `(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`,
+    "i",
+  );
+
+  const match = expression.exec(attributes);
+  return match?.[1] ?? match?.[2] ?? match?.[3];
+}
+
+function extractTitleTags(html: string): string[] {
+  return [...html.matchAll(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/gi)]
+    .map((match) => (match[1] ?? "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function extractMetaTags(html: string): Array<{
+  name: string;
+  content: string;
+}> {
+  const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
+
+  return tags.flatMap((tag) => {
+    const attributes = getTagAttributes(tag);
+    const name =
+      getAttribute(attributes, "name") ??
+      getAttribute(attributes, "property");
+
+    const content = getAttribute(attributes, "content");
+
+    return name && content !== undefined
+      ? [{ name: name.trim().toLowerCase(), content: content.trim() }]
+      : [];
+  });
+}
+
+function getMetaValues(
+  metaTags: Array<{ name: string; content: string }>,
+  names: readonly string[],
+): string[] {
+  const acceptedNames = new Set(names.map((name) => name.toLowerCase()));
+
+  return metaTags
+    .filter((tag) => acceptedNames.has(tag.name))
+    .map((tag) => tag.content)
+    .filter((value) => value.length > 0);
+}
+
+function createIssue(check: SeoCheck): AnalysisIssue {
   return {
-    id: `seo-${issue.category}-${issue.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")}`,
-    ...issue,
+    id: check.id,
+    category: "seo",
+    severity: check.severity,
+    title: check.title,
+    description: check.description,
+    recommendation: check.recommendation,
+    ...(check.element !== undefined ? { element: check.element } : {}),
+    ...(check.documentationUrl !== undefined
+      ? { documentationUrl: check.documentationUrl }
+      : {}),
   };
 }
-
-function normalizeOptions(
-  options: SeoAnalysisOptions,
-): Required<SeoAnalysisOptions> {
-  const normalized = {
-    ...DEFAULT_OPTIONS,
-    ...options,
-  };
-
-  if (
-    normalized.minTitleLength < 0 ||
-    normalized.maxTitleLength < normalized.minTitleLength ||
-    normalized.minDescriptionLength < 0 ||
-    normalized.maxDescriptionLength <
-      normalized.minDescriptionLength
-  ) {
-    throw new RangeError(
-      "SEO length limits must be non-negative and maximums must be at least minimums.",
-    );
-  }
-
-  return normalized;
-}
-
-function hasHttpUrl(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-
-  try {
-    const url = new URL(value);
-
-    return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      url.hostname.length > 0 &&
-      !url.username &&
-      !url.password
-    );
-  } catch {
-    return false;
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                               SEO Analysis                                 */
-/* -------------------------------------------------------------------------- */
 
 /**
- * Analyze metadata and return actionable SEO findings.
+ * Analyze common on-page SEO signals.
  *
- * Only checks that can be evaluated from the supplied metadata are included.
+ * The score is a heuristic for prioritization, not a Google ranking
+ * prediction or a substitute for a complete SEO audit.
  */
-export function analyzeSeoMetadata(
-  metadata: WebsiteMetadata,
-  options: SeoAnalysisOptions = {},
-): AnalysisIssue[] {
-  const limits = normalizeOptions(options);
+export function analyzeSeo(input: SeoAnalysisInput): SeoAnalysisResult {
+  const { html, metadata, statusCode } = input;
   const issues: AnalysisIssue[] = [];
+  const checks: SeoCheck[] = [];
 
-  const title = metadata.title?.trim() ?? "";
-  const description = metadata.description?.trim() ?? "";
-  const canonicalUrl = metadata.canonicalUrl?.trim() ?? "";
+  const titleTags = extractTitleTags(html);
+  const metaTags = extractMetaTags(html);
+  const descriptionTags = getMetaValues(metaTags, ["description"]);
+  const robotsTags = getMetaValues(metaTags, ["robots"]);
+  const h1Count = countMatches(html, /<h1\b[^>]*>/gi);
+  const imageTags = html.match(/<img\b[^>]*>/gi) ?? [];
 
-  /* -------------------------------- Title --------------------------------- */
+  const addCheck = (check: SeoCheck): void => {
+    checks.push(check);
 
-  if (!title) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "high",
-        title: "Missing page title",
-        description:
-          "The page does not provide a title in its analyzed metadata.",
-        recommendation:
-          "Add a unique, descriptive HTML title that explains the page's main topic.",
-      }),
-    );
-  } else if (title.length < limits.minTitleLength) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Page title may be too short",
-        description:
-          `The page title contains ${title.length} characters; ` +
-          `the configured recommended minimum is ${limits.minTitleLength}.`,
-        recommendation:
-          "Consider making the title more descriptive without adding unnecessary words.",
-      }),
-    );
-  } else if (title.length > limits.maxTitleLength) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "medium",
-        title: "Page title may be too long",
-        description:
-          `The page title contains ${title.length} characters; ` +
-          `the configured recommended maximum is ${limits.maxTitleLength}.`,
-        recommendation:
-          "Shorten the title while preserving its most important information.",
-      }),
-    );
-  }
+    if (check.failed) {
+      issues.push(createIssue(check));
+    }
+  };
 
-  /* ---------------------------- Description ------------------------------ */
+  addCheck({
+    id: "seo-title-missing",
+    title: "Missing page title",
+    description: "The HTML document does not contain a non-empty title tag.",
+    recommendation:
+      "Add one descriptive <title> element that accurately represents the page.",
+    severity: "high",
+    failed: titleTags.length === 0 || titleTags.every((title) => !title),
+    element: "<title>",
+    documentationUrl: "https://developers.google.com/search/docs/appearance/title-link",
+  });
 
-  if (!description) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "high",
-        title: "Missing meta description",
-        description:
-          "The analyzed metadata does not contain a meta description.",
-        recommendation:
-          "Add a concise, page-specific meta description summarizing the page.",
-      }),
-    );
-  } else if (description.length < limits.minDescriptionLength) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Meta description may be too short",
-        description:
-          `The meta description contains ${description.length} characters; ` +
-          `the configured recommended minimum is ${limits.minDescriptionLength}.`,
-        recommendation:
-          "Expand the description with useful information that accurately represents the page.",
-      }),
-    );
-  } else if (description.length > limits.maxDescriptionLength) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "medium",
-        title: "Meta description may be too long",
-        description:
-          `The meta description contains ${description.length} characters; ` +
-          `the configured recommended maximum is ${limits.maxDescriptionLength}.`,
-        recommendation:
-          "Shorten the description and keep the most useful information near the beginning.",
-      }),
-    );
-  }
+  const title = titleTags[0] ?? metadata.title ?? "";
 
-  /* ----------------------------- Canonical URL --------------------------- */
+  addCheck({
+    id: "seo-title-length",
+    title: "Page title length may need improvement",
+    description: `The detected title contains ${title.length} characters. This check flags titles shorter than 10 or longer than 60 characters as a heuristic.`,
+    recommendation:
+      "Write a unique, descriptive title. Treat character counts as guidance rather than a strict search-engine limit.",
+    severity: "low",
+    failed: title.length > 0 && (title.length < 10 || title.length > 60),
+    element: "<title>",
+    documentationUrl: "https://developers.google.com/search/docs/appearance/title-link",
+  });
 
-  if (!canonicalUrl) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Canonical URL not provided",
-        description:
-          "No canonical URL was found in the analyzed metadata.",
-        recommendation:
-          "Consider adding a canonical link when the page may be accessible through multiple URLs.",
-      }),
-    );
-  } else if (!hasHttpUrl(canonicalUrl)) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "medium",
-        title: "Invalid canonical URL",
-        description:
-          "The canonical URL is not a valid absolute HTTP or HTTPS URL.",
-        recommendation:
-          "Check the canonical link and provide the intended absolute page URL.",
-      }),
-    );
-  }
+  addCheck({
+    id: "seo-description-missing",
+    title: "Missing meta description",
+    description:
+      "No non-empty standard meta description was found in the HTML.",
+    recommendation:
+      "Add a concise, page-specific <meta name=\"description\"> tag.",
+    severity: "medium",
+    failed: descriptionTags.length === 0 && !metadata.description,
+    element: '<meta name="description">',
+    documentationUrl:
+      "https://developers.google.com/search/docs/appearance/snippet",
+  });
 
-  /* ---------------------------- Open Graph ------------------------------- */
+  const description = descriptionTags[0] ?? metadata.description ?? "";
 
-  const openGraph = metadata.openGraph;
+  addCheck({
+    id: "seo-description-length",
+    title: "Meta description length may need improvement",
+    description: `The detected description contains ${description.length} characters. This check flags descriptions shorter than 50 or longer than 160 characters as a heuristic.`,
+    recommendation:
+      "Write a useful, unique summary of the page. Search engines may display a different snippet.",
+    severity: "low",
+    failed:
+      description.length > 0 &&
+      (description.length < 50 || description.length > 160),
+    element: '<meta name="description">',
+    documentationUrl:
+      "https://developers.google.com/search/docs/appearance/snippet",
+  });
 
-  if (!openGraph.title?.trim()) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Open Graph title missing",
-        description:
-          "The metadata does not provide an Open Graph title.",
-        recommendation:
-          "Consider adding an og:title value for more descriptive social-sharing previews.",
-      }),
-    );
-  }
+  addCheck({
+    id: "seo-h1-missing",
+    title: "Missing primary heading",
+    description: "No H1 heading was found in the supplied HTML.",
+    recommendation:
+      "Add a clear main heading that describes the page's primary content.",
+    severity: "medium",
+    failed: h1Count === 0,
+    element: "<h1>",
+  });
 
-  if (!openGraph.description?.trim()) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Open Graph description missing",
-        description:
-          "The metadata does not provide an Open Graph description.",
-        recommendation:
-          "Consider adding an og:description value that summarizes the page.",
-      }),
-    );
-  }
+  addCheck({
+    id: "seo-h1-multiple",
+    title: "Multiple H1 headings detected",
+    description: `${h1Count} H1 elements were found. Multiple H1 elements are allowed in HTML, so this is a review suggestion rather than a standards violation.`,
+    recommendation:
+      "Check that the heading hierarchy communicates the page structure clearly.",
+    severity: "info",
+    failed: h1Count > 1,
+    element: "<h1>",
+  });
 
-  if (!hasHttpUrl(openGraph.image)) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "low",
-        title: "Open Graph image missing or invalid",
-        description:
-          "A valid absolute HTTP or HTTPS Open Graph image URL was not found.",
-        recommendation:
-          "Consider providing an accessible og:image URL for social-sharing previews.",
-      }),
-    );
-  }
+  const canonicalTags = (html.match(/<link\b[^>]*>/gi) ?? []).filter(
+    (tag) => {
+      const rel = getAttribute(getTagAttributes(tag), "rel");
 
-  /* ---------------------------- Twitter Card ----------------------------- */
+      return rel?.toLowerCase().split(/\s+/).includes("canonical") ?? false;
+    },
+  );
 
-  const twitterCard = metadata.twitterCard;
+  addCheck({
+    id: "seo-canonical-missing",
+    title: "Canonical link not found",
+    description:
+      "The supplied HTML does not contain a canonical link element.",
+    recommendation:
+      "If the page has duplicate or equivalent URLs, provide the preferred URL using a canonical link.",
+    severity: "low",
+    failed: canonicalTags.length === 0 && !metadata.canonicalUrl,
+    element: '<link rel="canonical">',
+    documentationUrl:
+      "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+  });
 
-  if (!twitterCard.card?.trim()) {
-    issues.push(
-      createIssue({
-        category: "seo",
-        severity: "info",
-        title: "Twitter Card type missing",
-        description:
-          "The analyzed metadata does not specify a Twitter Card type.",
-        recommendation:
-          "Consider specifying twitter:card, for example summary or summary_large_image.",
-      }),
-    );
-  }
+  addCheck({
+    id: "seo-canonical-duplicate",
+    title: "Multiple canonical links detected",
+    description: `${canonicalTags.length} canonical link elements were found.`,
+    recommendation:
+      "Review the canonical declarations and ensure the page has one clear preferred canonical URL.",
+    severity: "medium",
+    failed: canonicalTags.length > 1,
+    element: '<link rel="canonical">',
+    documentationUrl:
+      "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+  });
 
-  return issues;
-}
+  const imagesWithoutAlt = imageTags.filter((tag) => {
+    const attributes = getTagAttributes(tag);
+    return getAttribute(attributes, "alt") === undefined;
+  });
 
-/**
- * Returns a simple SEO score from 0 to 100.
- *
- * This is a NOTWEB heuristic, not an official search-engine score.
- */
-export function calculateSeoScore(
-  issues: readonly AnalysisIssue[],
-): number {
-  const penalties = {
+  addCheck({
+    id: "seo-images-alt-missing",
+    title: "Images without alt attributes",
+    description: `${imagesWithoutAlt.length} of ${imageTags.length} image elements lack an alt attribute. Decorative images may use an empty alt value.`,
+    recommendation:
+      "Add meaningful alternative text to informative images and alt=\"\" to decorative images.",
+    severity: "medium",
+    failed: imagesWithoutAlt.length > 0,
+    element: "<img>",
+    documentationUrl:
+      "https://www.w3.org/WAI/tutorials/images/",
+  });
+
+  const viewportTags = getMetaValues(metaTags, ["viewport"]);
+
+  addCheck({
+    id: "seo-viewport-missing",
+    title: "Viewport meta tag missing",
+    description:
+      "The supplied HTML does not contain a standard viewport meta tag.",
+    recommendation:
+      'Add <meta name="viewport" content="width=device-width, initial-scale=1"> to support mobile viewport sizing.',
+    severity: "medium",
+    failed: viewportTags.length === 0 && !metadata.viewport,
+    element: '<meta name="viewport">',
+    documentationUrl:
+      "https://developer.mozilla.org/docs/Web/HTML/Viewport_meta_tag",
+  });
+
+  addCheck({
+    id: "seo-open-graph-missing",
+    title: "Open Graph title or description missing",
+    description:
+      "Open Graph title or description metadata is incomplete.",
+    recommendation:
+      "Add og:title and og:description to improve how the page is represented when shared on supported platforms.",
+    severity: "low",
+    failed:
+      !metadata.openGraph.title?.trim() ||
+      !metadata.openGraph.description?.trim(),
+    element: '<meta property="og:title"> / <meta property="og:description">',
+  });
+
+  addCheck({
+    id: "seo-robots-noindex",
+    title: "Page has a noindex directive",
+    description:
+      "A robots meta tag appears to contain the noindex directive.",
+    recommendation:
+      "Confirm that search exclusion is intentional. Remove noindex only if the page should be eligible for indexing.",
+    severity: "high",
+    failed: robotsTags.some((value) => /(?:^|[,\s])noindex(?:$|[,\s])/i.test(value)),
+    element: '<meta name="robots">',
+  });
+
+  addCheck({
+    id: "seo-http-status",
+    title: "Unsuccessful HTTP status",
+    description: `The supplied response status is ${statusCode ?? "unknown"}.`,
+    recommendation:
+      "Inspect the response status in the fetching layer and resolve unexpected client or server errors.",
+    severity: "high",
+    failed: statusCode !== undefined && statusCode >= 400,
+  });
+
+  const penaltyBySeverity: Record<AnalysisSeverity, number> = {
     critical: 25,
     high: 15,
     medium: 8,
     low: 3,
     info: 0,
-  } as const;
+  };
 
-  const totalPenalty = issues
-    .filter((issue) => issue.category === "seo")
-    .reduce(
-      (total, issue) => total + penalties[issue.severity],
-      0,
-    );
+  const penalty = issues.reduce(
+    (total, issue) => total + penaltyBySeverity[issue.severity],
+    0,
+  );
 
-  return Math.max(0, Math.min(100, 100 - totalPenalty));
+  return {
+    score: Math.max(0, 100 - penalty),
+    issues,
+    checksPerformed: checks.length,
+  };
 }
 
 /**
- * Convenience API for the website analyzer package.
+ * Convenience helper returning only SEO issues.
  */
-export const seoAnalyzer = Object.freeze({
-  analyze: analyzeSeoMetadata,
-  calculateScore: calculateSeoScore,
-});
+export function getSeoIssues(input: SeoAnalysisInput): AnalysisIssue[] {
+  return analyzeSeo(input).issues;
+}
