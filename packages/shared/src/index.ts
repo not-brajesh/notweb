@@ -23,7 +23,7 @@ export * from "./logger.js";
 // Shared error handling
 // -----------------------------------------------------------------------------
 export * from "./guards.js";
-
+export * from "./safe-json.js";
 export * from "./errors.js";
 export * from "./config.js";
 // -----------------------------------------------------------------------------
