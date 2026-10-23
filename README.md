@@ -1,148 +1,75 @@
-<div align="center">
-
 # NOTWEB
 
 ### Beyond Websites. Beyond Limits.
 
 **One website. Multiple platforms. Unlimited possibilities.**
 
-An open-source, local-first platform designed to transform websites into responsive experiences, installable Progressive Web Apps, and cross-platform applications.
+NOTWEB is an open-source platform designed to transform websites into responsive experiences and cross-platform applications through intelligent analysis, automated optimization, and AI-assisted development.
 
-[Features](#-features) • [Architecture](#-architecture) • [Tech Stack](#-technology-stack) • [Roadmap](#-roadmap) • [Contributing](#-contributing)
+The long-term vision is to bring website analysis, responsive adaptation, Progressive Web App (PWA) generation, application wrapping, device previews, and AI-powered reconstruction together in one developer-friendly platform.
 
-<br>
-
-![Status](https://img.shields.io/badge/Status-Early%20Development-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![AI](https://img.shields.io/badge/AI-Local--First-purple?style=for-the-badge)
-![Open Source](https://img.shields.io/badge/Open%20Source-Yes-brightgreen?style=for-the-badge)
-
-</div>
+> **Project status:** Early development. Features described in the roadmap are planned and may not be implemented yet.
 
 ---
 
-## 🌌 What Is NOTWEB?
+## The Vision
 
-NOTWEB is an ambitious open-source project that aims to simplify the process of transforming websites into applications for different devices and platforms.
+Building for multiple platforms often means managing separate tools, configurations, and workflows.
 
-The project combines a browser extension, an intelligent development studio, website analysis tools, responsive previews, and application packaging workflows into one unified ecosystem.
+NOTWEB aims to simplify that process by bringing these capabilities into a unified workspace.
 
-Instead of manually rebuilding every website for every platform, NOTWEB aims to automate as much of the process as possible.
+- **Analyze** — Understand a website's structure and behavior.
+- **Adapt** — Identify and improve responsive layouts.
+- **Preview** — Test experiences across different screen sizes.
+- **Generate** — Prepare Progressive Web App configurations.
+- **Wrap** — Explore packaging web experiences for supported platforms.
+- **Reconstruct** — Use AI-assisted workflows to help developers improve or rebuild interfaces.
 
-**Our vision:** Make website-to-application transformation accessible, customizable, and developer-friendly.
-
-> Build once. Adapt everywhere.
-
-## ✨ Features
-
-### 🌐 1. Browser Extension
-
-Capture and analyse websites directly from the browser.
-
-- Capture website URLs and page metadata.
-- Inspect accessible page structure and layout information.
-- Send website information to NOTWEB Studio.
-- Start conversion workflows from a browser toolbar.
-- Manage captured projects.
-
-### 🧠 2. Intelligent Website Analysis
-
-Analyse website structure to help determine the best conversion strategy.
-
-- Inspect page structure and styles.
-- Identify layouts and reusable UI components.
-- Analyse navigation and responsive behaviour.
-- Detect potential compatibility issues.
-- Recommend an appropriate conversion approach.
-
-The initial implementation will use local processing wherever practical.
-
-### 🎨 3. Responsive Design Engine
-
-Preview and optimise application layouts for different screen sizes.
-
-- Mobile phones.
-- Tablets.
-- Laptops.
-- Desktop monitors.
-- Custom viewport dimensions.
-
-The goal is to identify layout problems and generate improvements without requiring manual testing on every physical device.
-
-### ⚡ 4. Hybrid Conversion Engine
-
-NOTWEB will support three complementary approaches.
-
-| Mode | Purpose |
-|---|---|
-| Website Wrapper | Display an existing website inside an application shell. |
-| UI Reconstruction | Generate an editable implementation inspired by an accessible website's structure and appearance. |
-| Responsive Optimisation | Analyse and improve layouts for different screen sizes. |
-
-The appropriate approach will depend on the website, its permissions, technical constraints, and the user's requirements.
-
-### 📱 5. Progressive Web Apps
-
-Generate installable web application projects with features such as:
-
-- Web app manifest.
-- Application icons.
-- Installation support.
-- Service worker integration.
-- Optional offline functionality.
-
-Offline capabilities will depend on the application's architecture and available resources.
-
-### 💻 6. Cross-Platform Applications
-
-NOTWEB aims to support application packaging workflows for:
-
-- Android.
-- iOS.
-- macOS.
-- Windows.
-
-The project will initially prioritise a working web application and PWA workflow before expanding into desktop and mobile packaging.
-
-Some targets require additional platform-specific development tools, signing credentials, or developer accounts.
-
-### 🔒 7. Local-First AI
-
-NOTWEB is designed around a local-first philosophy.
-
-- Prefer local processing when practical.
-- Support compatible open-source AI models.
-- Avoid mandatory paid AI APIs in the core workflow.
-- Keep user control and privacy central to the design.
-- Make processing requirements and limitations transparent.
-
-Local AI capabilities will depend on the selected model and available hardware.
+Our goal is to make the journey from website to multi-platform experience more accessible.
 
 ---
 
-## 🏗️ Architecture
+## Planned Features
 
-NOTWEB uses a modular monorepo architecture so individual components can evolve independently.
+| Feature | Description | Status |
+|---|---|---|
+| Website Analyzer | Inspect website structure and resources | Planned |
+| Responsive Engine | Help identify layout and viewport issues | Planned |
+| Device Preview | Preview layouts across device sizes | Planned |
+| AI Engine | Support AI-assisted analysis and reconstruction | Planned |
+| PWA Generator | Generate PWA-related files and configurations | Planned |
+| Wrapper Engine | Prepare web experiences for application wrappers | Planned |
+| Application Packager | Support packaging workflows for compatible platforms | Planned |
+| Browser Extension | Provide browser-based access to NOTWEB tools | Planned |
+| NOTWEB Studio | Offer a unified workspace for projects | Planned |
+| Local-First Workflows | Prioritize local processing where practical | Planned |
+
+Features will be marked as implemented only after they are working and tested.
+
+---
+
+## Architecture
+
+NOTWEB is organized as a modular monorepo.
 
 ```text
-NOTWEB/
-│
+notweb/
 ├── apps/
-│   ├── studio/                  # Main development studio
-│   ├── extension/               # Browser extension
-│   ├── api/                     # Backend API
-│   └── desktop/                 # Desktop application
+│   ├── studio/       # Main development workspace
+│   ├── extension/    # Browser extension
+│   ├── api/          # Optional API services
+│   └── desktop/      # Desktop application
 │
 ├── packages/
-│   ├── ui/                      # Shared UI components
-│   ├── shared/                  # Shared utilities and types
-│   ├── website-analyzer/        # Website inspection
-│   ├── responsive-engine/      # Responsive analysis
-│   ├── ai-engine/               # Local AI integration
-│   ├── device-preview/          # Device viewport previews
-│   ├── wrapper-engine/          # Website wrapper workflows
-│   ├── pwa-generator/           # PWA project generation
-│   └── app-packager/            # Platform packaging
+│   ├── ui/                  # Shared UI components
+│   ├── shared/              # Shared utilities and types
+│   ├── website-analyzer/    # Website analysis
+│   ├── responsive-engine/   # Responsive layout tools
+│   ├── ai-engine/           # AI integration and orchestration
+│   ├── device-preview/      # Device preview utilities
+│   ├── wrapper-engine/      # Web application wrapping
+│   ├── pwa-generator/       # PWA generation
+│   └── app-packager/        # Application packaging
 │
 ├── tests/
 │   ├── unit/
@@ -155,211 +82,201 @@ NOTWEB/
 │   └── api/
 │
 ├── scripts/
-├── .github/
-│   └── workflows/
-│
-├── package.json
-├── pnpm-workspace.yaml
-├── turbo.json
-├── tsconfig.base.json
-└── README.md
+└── .github/
+    └── workflows/
 ```
 
-*This is the planned architecture. Individual components will become functional as development progresses.*
-
-## 🛠️ Technology Stack
-
-| Component | Planned Technology |
-|---|---|
-| Language | TypeScript |
-| Browser Extension | WXT |
-| Studio Frontend | React + Next.js |
-| Styling | Tailwind CSS |
-| UI Components | shadcn/ui |
-| Backend | Node.js + Fastify |
-| Monorepo | pnpm + Turborepo |
-| Browser Automation | Playwright |
-| Testing | Vitest + Playwright |
-| PWA Generation | Vite + PWA tooling |
-| Desktop Packaging | Tauri |
-| Mobile Packaging | Capacitor |
-| AI | Compatible local open-source models |
-| Version Control | Git + GitHub Actions |
-
-The final stack may evolve as the project develops and technical requirements become clearer.
-
-## 🚀 Development Roadmap
-
-NOTWEB is currently in its early development stage. The following milestones describe the intended development sequence.
-
-### Phase 1 — Project Foundation
-- [x] Create the GitHub repository.
-- [x] Establish the initial project directory structure.
-- [ ] Configure Git and automated quality checks.
-- [ ] Set up the monorepo workspace.
-- [ ] Add development documentation.
-
-### Phase 2 — Browser Extension
-- [ ] Create the extension interface.
-- [ ] Capture the active tab's URL and metadata.
-- [ ] Extract permitted page structure information.
-- [ ] Connect the extension to NOTWEB Studio.
-- [ ] Add error handling and permission controls.
-
-### Phase 3 — NOTWEB Studio
-- [ ] Build the main dashboard.
-- [ ] Add URL-based project creation.
-- [ ] Create a website analysis interface.
-- [ ] Add responsive device previews.
-- [ ] Add project history and export controls.
-
-### Phase 4 — Conversion Engine
-- [ ] Implement the website wrapper workflow.
-- [ ] Build the first responsive analysis engine.
-- [ ] Generate basic PWA projects.
-- [ ] Add editable UI reconstruction.
-- [ ] Validate generated projects automatically.
-
-### Phase 5 — Local AI
-- [ ] Integrate a compatible local model.
-- [ ] Add AI-assisted layout analysis.
-- [ ] Generate and refine UI components.
-- [ ] Add model configuration and resource checks.
-
-### Phase 6 — Cross-Platform Packaging
-- [ ] Add desktop application packaging.
-- [ ] Add Android packaging.
-- [ ] Investigate and implement iOS workflows.
-- [ ] Add platform-specific validation.
-- [ ] Document signing and distribution requirements.
-
-### Phase 7 — Release
-- [ ] Complete automated tests.
-- [ ] Publish installation instructions.
-- [ ] Add example projects.
-- [ ] Prepare the first public release.
-
-**Roadmap note:** These are planned features, not claims that the functionality is already implemented.
-
-## 💻 Getting Started
-
-The project scaffold is being prepared. Installation instructions will be updated once the workspace configuration and initial applications are implemented.
-
-### Prerequisites
-
-The planned development environment includes:
-
-- macOS, Linux, or Windows.
-- Node.js with a supported LTS release.
-- pnpm.
-- Git.
-- A Chromium-based browser for initial extension development.
-
-Additional tools will be required for some desktop and mobile targets.
-
-### Future Setup
-
-The intended setup workflow will look similar to:
-
-```bash
-git clone https://github.com/not-brajesh/notweb.git
-
-cd notweb
-
-pnpm install
-
-pnpm dev
-```
-
-**Note:** These commands are illustrative until the root package scripts and application configurations are implemented.
-
-## 🔐 Security and Privacy
-
-Security is a core design consideration.
-
-NOTWEB will aim to:
-
-- Request only the browser permissions it needs.
-- Avoid collecting website credentials.
-- Keep sensitive configuration out of source control.
-- Validate URLs before accessing websites.
-- Restrict local services to trusted origins where appropriate.
-- Avoid executing untrusted website code directly on the host.
-- Make external network requests transparent.
-- Provide clear controls for website capture and export.
-
-Website access may be limited by authentication, browser security policies, cross-origin restrictions, content protection, or website terms.
-
-NOTWEB does not promise to bypass those restrictions.
-
-## ⚖️ Important Limitations
-
-Not every website can be converted perfectly into a native application.
-
-For example:
-
-- Some websites require their original backend.
-- Authentication and payment workflows may require special handling.
-- Protected resources may not be accessible.
-- Generated interfaces may need manual refinement.
-- iOS and desktop packaging may require platform-specific configuration.
-- Some applications depend on capabilities that cannot be reproduced by a generic wrapper.
-
-NOTWEB will focus on transparent conversion workflows rather than claiming that every website can be converted automatically without limitations.
-
-## 🤝 Contributing
-
-Contributions, bug reports, feature requests, and technical discussions are welcome.
-
-Before contributing:
-
-1. Check existing issues.
-2. Describe the proposed change.
-3. Keep pull requests focused.
-4. Include tests where appropriate.
-5. Document significant architectural changes.
-6. Never commit secrets or private credentials.
-
-Contribution instructions will be expanded as the development workflow becomes available.
-
-## 🗺️ Project Principles
-
-NOTWEB is guided by five principles:
-
-1. **Open Source:** Make the platform accessible to developers.
-2. **Local First:** Prefer local execution when practical.
-3. **Modular Architecture:** Keep components reusable and maintainable.
-4. **User Control:** Make generated output editable and exportable.
-5. **Honest Automation:** Clearly communicate limitations and failures.
-
-## 📜 License
-
-NOTWEB is intended to use the MIT License.
-
-The repository's final licensing terms will be established when the `LICENSE` file is populated.
-
-## 🌟 Support the Project
-
-If you find the project interesting:
-
-- ⭐ Star the repository.
-- 🐛 Report bugs.
-- 💡 Suggest improvements.
-- 🧪 Test early versions.
-- 🤝 Contribute code and documentation.
-
-Every contribution helps move the project forward.
+The architecture is intended to keep features modular, reusable, and independently testable.
 
 ---
 
-<div align="center">
+## Technology Direction
 
-### NOTWEB
+The project is being developed with a modern TypeScript-oriented toolchain.
 
-**Beyond Websites. Beyond Limits.**
+| Technology | Intended role |
+|---|---|
+| TypeScript | Type-safe application and package development |
+| React | Interactive user interfaces |
+| Node.js | Development tooling and backend services |
+| pnpm | Package management and workspace dependencies |
+| Turborepo | Monorepo task orchestration |
+| ESLint | Code quality checks |
+| Prettier | Consistent code formatting |
+| Playwright | End-to-end testing |
+| Local AI models | Optional AI-assisted workflows |
 
-*An open-source vision for turning the web into applications.*
+The exact stack may evolve as implementation and testing progress.
 
-[GitHub Repository](https://github.com/not-brajesh/notweb)
+---
 
-</div>
+## Design Principles
+
+### 1. Modular by Design
+Features should be separated into reusable packages with clear responsibilities.
+
+### 2. Local-First Where Practical
+Prefer local processing when feasible. External AI services should be optional rather than a mandatory requirement for every workflow.
+
+### 3. Developer-Friendly
+Provide clear interfaces, predictable configuration, useful errors, and documented workflows.
+
+### 4. Responsive by Default
+Treat mobile, tablet, and desktop experiences as first-class targets.
+
+### 5. Privacy-Conscious
+Make data flows understandable and avoid transmitting website content to external services without an explicit, documented reason.
+
+### 6. Open Source
+Encourage community contributions, transparent development, and reproducible workflows.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+Install the following tools:
+
+- Node.js 22 or a compatible supported version
+- pnpm 10 or a compatible supported version
+- Git
+
+Check your installed versions:
+
+```bash
+node --version
+pnpm --version
+git --version
+```
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/not-brajesh/notweb.git
+cd notweb
+```
+
+Install workspace dependencies:
+
+```bash
+pnpm install
+```
+
+**Development note:** The repository is under active development. Installation alone does not guarantee that every application can run yet. Individual apps and packages need their respective configuration and scripts implemented.
+
+---
+
+## Development Commands
+
+The root project is designed to support these commands as the relevant package scripts are implemented.
+
+```bash
+pnpm dev
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm format
+pnpm format:check
+```
+
+Some commands may remain unavailable until their dependencies and package-level scripts have been configured.
+
+---
+
+## Roadmap
+
+### Stage 1 — Foundation
+- [x] Establish the repository structure
+- [x] Configure the pnpm workspace
+- [x] Configure Turborepo
+- [x] Establish TypeScript base settings
+- [x] Establish formatting and linting configuration
+- [ ] Complete dependency and script configuration
+- [ ] Add continuous integration checks
+
+### Stage 2 — Core Engine
+- [ ] Define shared types and interfaces
+- [ ] Implement website analysis
+- [ ] Build responsive layout diagnostics
+- [ ] Add device preview utilities
+- [ ] Create automated tests
+
+### Stage 3 — NOTWEB Studio
+- [ ] Build the main interface
+- [ ] Add project creation and management
+- [ ] Integrate analysis results
+- [ ] Add responsive preview workflows
+
+### Stage 4 — AI and Generation
+- [ ] Implement an AI provider abstraction
+- [ ] Explore local-model integrations
+- [ ] Generate PWA assets and configurations
+- [ ] Add AI-assisted reconstruction workflows
+
+### Stage 5 — Cross-Platform Workflows
+- [ ] Develop the browser extension
+- [ ] Build application wrapper workflows
+- [ ] Explore desktop packaging
+- [ ] Document platform-specific limitations
+
+### Stage 6 — Reliability and Release
+- [ ] Add unit and integration tests
+- [ ] Add end-to-end tests
+- [ ] Configure CI
+- [ ] Publish developer documentation
+- [ ] Prepare an initial public release
+
+---
+
+## Contributing
+
+Contributions, bug reports, feature proposals, and documentation improvements are welcome.
+
+Before contributing:
+
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+2. Review the project's current issues and roadmap.
+3. Keep changes focused and testable.
+4. Document new behavior and configuration.
+5. Avoid committing credentials, API keys, or private website data.
+
+For security-sensitive reports, follow [SECURITY.md](SECURITY.md).
+
+---
+
+## Security and Privacy
+
+NOTWEB may eventually inspect website content, source code, and external resources.
+
+Security-sensitive features must account for:
+
+- Untrusted website content
+- Malicious URLs and redirects
+- Secret and credential exposure
+- Safe handling of downloaded resources
+- Permission boundaries for browser extensions
+- Explicit consent for external AI processing
+
+See [SECURITY.md](SECURITY.md) for reporting guidance.
+
+---
+
+## License
+
+NOTWEB is distributed under the [MIT License](LICENSE).
+
+---
+
+## Project Philosophy
+
+We believe developers should not need a completely different workflow for every platform.
+
+NOTWEB aims to make website analysis, responsive optimization, and multi-platform development feel like parts of one connected process.
+
+**Build once. Adapt intelligently. Reach more platforms.**
+
+**NOTWEB — Beyond Websites. Beyond Limits.**
