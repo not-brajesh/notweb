@@ -20,7 +20,12 @@ import {
 /*                                  Types                                     */
 /* -------------------------------------------------------------------------- */
 
-export type AnalysisSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type AnalysisSeverity =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "info";
 
 export type AnalysisCategory =
   | "seo"
@@ -31,21 +36,57 @@ export type AnalysisCategory =
   | "responsive-design"
   | "best-practices";
 
-export type AnalysisStatus = "queued" | "running" | "completed" | "failed";
+export type AnalysisStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed";
 
 export interface WebsiteMetadata {
+  /** Original URL supplied for analysis. */
   url: string;
+
+  /** Final URL after redirects, when available. */
   finalUrl?: string;
+
+  /** Document title. */
   title: string | null;
+
+  /** Meta description. */
   description: string | null;
+
+  /** HTML document language. */
   language: string | null;
+
+  /** Document character encoding. */
   charset: string | null;
+
+  /** Viewport configuration. */
   viewport: string | null;
+
+  /** Canonical page URL. */
   canonicalUrl: string | null;
+
+  /** Resolved favicon URL. */
   faviconUrl: string | null;
+
+  /** Robots directives. */
   robots: string | null;
+
+  /** Document author. */
+  author?: string | null;
+
+  /** Search keywords. */
+  keywords?: string | null;
+
+  /** Open Graph metadata. */
   openGraph: Record<string, string>;
+
+  /** Twitter card metadata represented as key-value pairs. */
   twitterCard: Record<string, string>;
+
+  /** Structured Twitter metadata retained by the extractor. */
+  twitter?: Record<string, string>;
 }
 
 export interface AnalysisIssue {
@@ -132,7 +173,9 @@ export const ANALYSIS_CATEGORIES: readonly AnalysisCategory[] = [
  * Before fetching, validate DNS results and every redirect destination,
  * block private/loopback/link-local IP addresses, and restrict protocols.
  */
-export function validateAnalysisUrl(value: string): WebsiteUrlValidation {
+export function validateAnalysisUrl(
+  value: string,
+): WebsiteUrlValidation {
   if (typeof value !== "string" || value.trim().length === 0) {
     return {
       valid: false,
@@ -171,10 +214,15 @@ export function validateAnalysisUrl(value: string): WebsiteUrlValidation {
     };
   }
 
-  if (!parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
+  if (
+    !parsedUrl.hostname ||
+    parsedUrl.username ||
+    parsedUrl.password
+  ) {
     return {
       valid: false,
-      error: "The URL must contain a hostname and must not include credentials.",
+      error:
+        "The URL must contain a hostname and must not include credentials.",
     };
   }
 
@@ -183,7 +231,9 @@ export function validateAnalysisUrl(value: string): WebsiteUrlValidation {
   if (!sharedValidation.valid) {
     return {
       valid: false,
-      error: sharedValidation.errors[0] ?? "The website URL is invalid.",
+      error:
+        sharedValidation.errors[0] ??
+        "The website URL is invalid.",
     };
   }
 
@@ -201,7 +251,9 @@ export function validateAnalysisUrl(value: string): WebsiteUrlValidation {
  * Returns a score from 0 to 100.
  * A null score means that the category has not been evaluated.
  */
-export function normalizeScore(value: number | null): number | null {
+export function normalizeScore(
+  value: number | null,
+): number | null {
   if (value === null || !Number.isFinite(value)) {
     return null;
   }
@@ -242,7 +294,9 @@ export function calculateCategoryScore(
  * Creates an empty metadata record for a URL.
  * Actual metadata must be extracted by a separate HTML parser.
  */
-export function createEmptyMetadata(url: string): WebsiteMetadata {
+export function createEmptyMetadata(
+  url: string,
+): WebsiteMetadata {
   return {
     url,
     title: null,
@@ -253,8 +307,11 @@ export function createEmptyMetadata(url: string): WebsiteMetadata {
     canonicalUrl: null,
     faviconUrl: null,
     robots: null,
+    author: null,
+    keywords: null,
     openGraph: {},
     twitterCard: {},
+    twitter: {},
   };
 }
 
