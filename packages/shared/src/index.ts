@@ -37,7 +37,7 @@ export * from "./api.js";
 export * from "./timeout.js";
 export * from "./ids.js";
 export * from "./retry.js";
-
+export * from "./async.js";
 // -----------------------------------------------------------------------------
 // Date and time utilities
 // -----------------------------------------------------------------------------
