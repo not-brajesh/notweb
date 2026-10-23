@@ -1,161 +1,123 @@
 
 /**
- * NOTWEB Date Utilities
+ * NOTWEB Shared Package
  *
- * Shared date and timestamp helpers used across the platform.
- * ISO timestamps are normalized to UTC.
+ * Central entry point for shared types, constants, errors,
+ * validation helpers, ID utilities, and date utilities.
  */
 
-export type DateInput = Date | string | number;
+// -----------------------------------------------------------------------------
+// Package metadata
+// -----------------------------------------------------------------------------
+
+export const NOTWEB_NAME = "NOTWEB";
+export const NOTWEB_VERSION = "0.1.0";
+
+// -----------------------------------------------------------------------------
+// Shared constants
+// -----------------------------------------------------------------------------
+
+export * from "./constants.js";
+
+// -----------------------------------------------------------------------------
+// Shared error handling
+// -----------------------------------------------------------------------------
+
+export * from "./errors.js";
+
+// -----------------------------------------------------------------------------
+// Validation utilities
+// -----------------------------------------------------------------------------
+
+export * from "./validation.js";
+
+// -----------------------------------------------------------------------------
+// ID utilities
+// -----------------------------------------------------------------------------
+
+export * from "./ids.js";
+
+// -----------------------------------------------------------------------------
+// Date and time utilities
+// -----------------------------------------------------------------------------
+
+export * from "./date.js";
+
+// -----------------------------------------------------------------------------
+// Common application types
+// -----------------------------------------------------------------------------
+
+export interface AppError {
+  code: string;
+  message: string;
+  details?: unknown;
+}
+
+export type Result<T, E = AppError> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: E;
+    };
 
 /**
- * Checks whether a value represents a valid date input.
+ * Creates a nominally branded type to distinguish string identifiers.
  */
-export function isValidDate(value: unknown): value is DateInput {
+export type Brand<T, Name extends string> = T & {
+  readonly __brand: Name;
+};
+
+/**
+ * Shared identifier types.
+ */
+export type ProjectId = Brand<string, "ProjectId">;
+export type JobId = Brand<string, "JobId">;
+export type UserId = Brand<string, "UserId">;
+
+/**
+ * Represents the supported application environment.
+ */
+export type AppEnvironment =
+  | "development"
+  | "test"
+  | "production";
+
+/**
+ * Represents a generic key-value object.
+ */
+export type JsonRecord = Record<string, unknown>;
+
+/**
+ * Checks whether a value is a non-empty string.
+ */
+export function isNonEmptyString(
+  value: unknown,
+): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Safely converts an unknown value into a readable string.
+ */
+export function toSafeString(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
   if (
-    !(value instanceof Date) &&
-    typeof value !== "string" &&
-    typeof value !== "number"
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
   ) {
-    return false;
+    return String(value);
   }
 
-  const date = value instanceof Date ? value : new Date(value);
-
-  return !Number.isNaN(date.getTime());
-}
-
-/**
- * Converts a valid date into a UTC ISO timestamp.
- *
- * Example: 2026-10-23T10:30:00.000Z
- */
-export function toIsoTimestamp(value: DateInput = new Date()): string {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new RangeError("Cannot convert an invalid date to an ISO timestamp.");
+  if (value instanceof Error) {
+    return value.message;
   }
 
-  return date.toISOString();
-}
-
-/**
- * Returns the current UTC timestamp.
- */
-export function getCurrentTimestamp(): string {
-  return new Date().toISOString();
-}
-
-/**
- * Converts a date into Unix time in milliseconds.
- */
-export function toUnixMilliseconds(value: DateInput): number {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new RangeError("Cannot convert an invalid date to Unix milliseconds.");
-  }
-
-  return date.getTime();
-}
-
-/**
- * Compares two dates.
- *
- * Negative: first date is earlier.
- * Zero: both dates represent the same instant.
- * Positive: first date is later.
- */
-export function compareDates(
-  firstDate: DateInput,
-  secondDate: DateInput,
-): number {
-  return (
-    toUnixMilliseconds(firstDate) - toUnixMilliseconds(secondDate)
-  );
-}
-
-/**
- * Checks whether a date falls between two dates, inclusive.
- */
-export function isDateBetween(
-  value: DateInput,
-  startDate: DateInput,
-  endDate: DateInput,
-): boolean {
-  const timestamp = toUnixMilliseconds(value);
-  const start = toUnixMilliseconds(startDate);
-  const end = toUnixMilliseconds(endDate);
-
-  if (start > end) {
-    throw new RangeError("The start date must not be after the end date.");
-  }
-
-  return timestamp >= start && timestamp <= end;
-}
-
-/**
- * Adds a duration in milliseconds to a date.
- */
-export function addMilliseconds(
-  value: DateInput,
-  milliseconds: number,
-): Date {
-  if (!Number.isFinite(milliseconds)) {
-    throw new RangeError("The duration must be a finite number.");
-  }
-
-  const result = toUnixMilliseconds(value) + milliseconds;
-
-  if (!Number.isFinite(result) || Math.abs(result) > 8.64e15) {
-    throw new RangeError("The resulting date is outside the supported range.");
-  }
-
-  return new Date(result);
-}
-
-/**
- * Formats a date for display.
- *
- * By default, the runtime's locale and timezone are used.
- * Supply explicit options for consistent formatting.
- */
-export function formatDateTime(
-  value: DateInput,
-  options: {
-    locale?: string;
-    timeZone?: string;
-    dateStyle?: "full" | "long" | "medium" | "short";
-    timeStyle?: "full" | "long" | "medium" | "short";
-  } = {},
-): string {
-  const {
-    locale,
-    timeZone,
-    dateStyle = "medium",
-    timeStyle = "short",
-  } = options;
-
-  const date = new Date(toUnixMilliseconds(value));
-
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle,
-    timeStyle,
-    ...(timeZone === undefined ? {} : { timeZone }),
-  }).format(date);
-}
-
-/**
- * Checks whether a date is in the past.
- */
-export function isPastDate(value: DateInput): boolean {
-  return toUnixMilliseconds(value) < Date.now();
-}
-
-/**
- * Checks whether a date is in the future.
- */
-export function isFutureDate(value: DateInput): boolean {
-  return toUnixMilliseconds(value) > Date.now();
+  return "";
 }
