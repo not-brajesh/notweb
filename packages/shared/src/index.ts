@@ -19,6 +19,7 @@ export const NOTWEB_VERSION = "0.1.0";
 export * from "./guards.js";
 export * from "./constants.js";
 export * from "./logger.js";
+export * from "./deep-clone.js";
 // -----------------------------------------------------------------------------
 // Shared error handling
 // -----------------------------------------------------------------------------
