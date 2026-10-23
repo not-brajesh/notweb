@@ -38,6 +38,7 @@ export * from "./config.js";
 export * from "./http.js";
 export * from "./validation.js";
 export * from "./api.js";
+export * from "./rate-limiter.js";
 // -----------------------------------------------------------------------------
 // ID utilities
 // -----------------------------------------------------------------------------
