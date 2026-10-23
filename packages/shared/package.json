@@ -15,8 +15,5 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src",
     "clean": "rm -rf dist"
-  },
-  "devDependencies": {
-    "typescript": "workspace:^"
   }
 }
