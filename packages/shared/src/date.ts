@@ -1,4 +1,4 @@
-```typescript
+typescript
 /**
  * NOTWEB Date Utilities
  *
@@ -146,4 +146,3 @@ export function isPastDate(value: DateInput): boolean {
 export function isFutureDate(value: DateInput): boolean {
   return toUnixMilliseconds(value) > Date.now();
 }
-```
