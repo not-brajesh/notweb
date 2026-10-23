@@ -105,7 +105,8 @@ export function memoize<TArguments extends unknown[], TResult>(
 
   const cache = new Map<string, TResult>();
 
-  const getKey = options.key ?? createDefaultKey;
+const getKey: (...args: TArguments) => string =
+  options.key ?? ((...args: TArguments) => createDefaultKey(args));
 
   const memoized = ((...args: TArguments): TResult => {
     const cacheKey = getKey(...args);
