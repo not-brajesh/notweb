@@ -23,6 +23,7 @@ export * from "./constants.js";
 export * from "./logger.js";
 export * from "./deep-clone.js";
 export * from "./event-emitter.js";
+export * from "./disposable.js";
 // -----------------------------------------------------------------------------
 // Shared error handling
 // -----------------------------------------------------------------------------
