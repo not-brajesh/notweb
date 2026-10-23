@@ -25,7 +25,7 @@ export * from "./deep-clone.js";
 export * from "./event-emitter.js";
 export * from "./disposable.js";
 // -----------------------------------------------------------------------------
-// Shared error handlin
+// Shared error handling
 // -----------------------------------------------------------------------------
 export * from "./guards.js";
 export * from "./safe-json.js";
