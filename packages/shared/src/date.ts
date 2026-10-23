@@ -1,4 +1,4 @@
-```typescript
+
 /**
  * NOTWEB Date Utilities
  *
