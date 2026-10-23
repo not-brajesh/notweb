@@ -221,6 +221,12 @@ function getLinkHref(
   return undefined;
 }
 
+/**
+ * Resolve an extracted metadata URL.
+ *
+ * This function validates URL syntax and protocol only.
+ * It does not establish that the URL is safe for server-side fetching.
+ */
 function resolveMetadataUrl(
   value: string | undefined,
   baseUrl: string | undefined,
@@ -241,7 +247,7 @@ function resolveMetadataUrl(
       return undefined;
     }
 
-    if (parsed.username || parsed.password) {
+    if (parsed.username || parsed.password || !parsed.hostname) {
       return undefined;
     }
 
@@ -289,6 +295,8 @@ function extractTwitter(html: string): TwitterMetadata {
 
 /**
  * Extract metadata from an HTML document.
+ *
+ * Missing optional metadata is represented by empty strings.
  */
 export function extractWebsiteMetadata(
   html: string,
@@ -337,6 +345,25 @@ export function extractWebsiteMetadata(
     options.baseUrl,
   );
 
+  /*
+   * WebsiteMetadata.twitterCard is Record<string, string>,
+   * not a single string. Keep it as an object to match index.ts.
+   */
+  const twitterCard: Record<string, string> = {
+    ...(twitter.card !== undefined ? { card: twitter.card } : {}),
+    ...(twitter.title !== undefined ? { title: twitter.title } : {}),
+    ...(twitter.description !== undefined
+      ? { description: twitter.description }
+      : {}),
+    ...(resolvedTwitterImage !== undefined
+      ? { image: resolvedTwitterImage }
+      : {}),
+    ...(twitter.site !== undefined ? { site: twitter.site } : {}),
+    ...(twitter.creator !== undefined
+      ? { creator: twitter.creator }
+      : {}),
+  };
+
   const metadata = {
     url: options.baseUrl ?? "",
     title,
@@ -350,8 +377,7 @@ export function extractWebsiteMetadata(
     charset: getCharset(html),
     viewport: getMetaContent(html, ["viewport"]) ?? "",
 
-    // Required by WebsiteMetadata in index.ts.
-    twitterCard: twitter.card ?? "",
+    twitterCard,
 
     openGraph: {
       title: openGraph.title ?? "",
@@ -414,7 +440,7 @@ export function getMetadataOrigin(
       return undefined;
     }
 
-    if (parsed.username || parsed.password) {
+    if (parsed.username || parsed.password || !parsed.hostname) {
       return undefined;
     }
 
