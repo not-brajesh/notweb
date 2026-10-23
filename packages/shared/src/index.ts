@@ -24,7 +24,7 @@ export interface AppError {
   message: string;
   details?: unknown;
 }
-
+export * from "./date.js";
 export type Result<T, E = AppError> =
   | {
       success: true;
