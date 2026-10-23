@@ -1,4 +1,4 @@
-```typescript
+
 /**
  * NOTWEB — Website Metadata Extractor
  *
@@ -423,4 +423,3 @@ export function getMetadataOrigin(
     return undefined;
   }
 }
-```
