@@ -22,6 +22,7 @@ export * from "./guards.js";
 export * from "./constants.js";
 export * from "./logger.js";
 export * from "./deep-clone.js";
+export * from "./event-emitter.js";
 // -----------------------------------------------------------------------------
 // Shared error handling
 // -----------------------------------------------------------------------------
