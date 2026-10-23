@@ -198,11 +198,7 @@ export function analyzeAccessibility(
       .filter((id): id is string => Boolean(id)),
   );
 
-  const inputIds = new Set(
-    inputs
-      .map((input) => getAttribute(getAttributes(input), "id"))
-      .filter((id): id is string => Boolean(id)),
-  );
+ 
 
   const unlabelledInputs = inputs.filter((input) => {
     const attributes = getAttributes(input);
