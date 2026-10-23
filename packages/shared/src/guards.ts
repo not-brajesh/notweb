@@ -67,7 +67,7 @@ export function isBoolean(value: unknown): value is boolean {
 /**
  * Checks whether a value is a non-empty string.
  */
-export function isNonEmptyString(value: unknown): value is string {
+export function isNonEmptyStringValue(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
