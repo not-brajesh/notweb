@@ -67,14 +67,19 @@ export class Logger {
   private readonly timestamps: boolean;
   private currentLevel: LogLevelValue;
 
-  constructor(options: LoggerOptions = {}) {
-    this.context = options.context;
-    this.timestamps = options.timestamps ?? true;
 
-    this.currentLevel = isLogLevel(options.level)
-      ? options.level
-      : DEFAULT_LOG_LEVEL;
+constructor(options: LoggerOptions = {}) {
+  if (options.context !== undefined) {
+    this.context = options.context;
   }
+
+  this.timestamps = options.timestamps ?? true;
+
+  this.currentLevel = isLogLevel(options.level)
+    ? options.level
+    : DEFAULT_LOG_LEVEL;
+}
+
 
   /**
    * Changes the minimum log severity at runtime.
