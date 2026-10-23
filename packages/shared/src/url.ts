@@ -42,8 +42,13 @@ export function parseUrl(value: string): URL | null {
 
 /**
  * Validates an absolute HTTP or HTTPS URL.
+ *
+ * This checks URL syntax and supported protocols only.
+ * It does not establish whether the destination is safe to fetch.
  */
-export function validateWebsiteUrlDetailed(value: string): UrlValidationResult {
+export function validateWebsiteUrlDetailed(
+  value: string,
+): UrlValidationResult {
   const trimmed = value.trim();
 
   if (trimmed.length === 0) {
@@ -102,7 +107,7 @@ export function validateWebsiteUrlDetailed(value: string): UrlValidationResult {
  * Does not remove query parameters or fragments because they may be meaningful.
  */
 export function normalizeUrl(value: string): string {
-  const result = validateWebsiteUrl(value);
+  const result = validateWebsiteUrlDetailed(value);
 
   if (!result.valid || result.normalizedUrl === undefined) {
     throw new TypeError(result.error ?? "Invalid website URL.");
@@ -152,7 +157,9 @@ export function resolveUrl(relative: string, base: string): string {
   }
 
   if (resolved.username || resolved.password) {
-    throw new TypeError("Resolved URLs must not contain embedded credentials.");
+    throw new TypeError(
+      "Resolved URLs must not contain embedded credentials.",
+    );
   }
 
   return resolved.href;
