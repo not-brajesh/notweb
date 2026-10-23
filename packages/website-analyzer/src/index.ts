@@ -183,7 +183,7 @@ export function validateAnalysisUrl(value: string): WebsiteUrlValidation {
   if (!sharedValidation.valid) {
     return {
       valid: false,
-      error: sharedValidation.error ?? "The website URL is invalid.",
+      error: sharedValidation.errors[0] ?? "The website URL is invalid.",
     };
   }
 
