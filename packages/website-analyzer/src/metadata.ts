@@ -1,4 +1,4 @@
-
+```typescript
 /**
  * NOTWEB — Website Metadata Extractor
  *
@@ -11,7 +11,7 @@
 import type { WebsiteMetadata } from "./index.js";
 
 export interface MetadataExtractionOptions {
-  /** Optional URL used to resolve relative canonical and image URLs. */
+  /** Optional URL used to resolve relative metadata URLs. */
   baseUrl?: string;
 }
 
@@ -55,10 +55,10 @@ function decodeHtmlEntities(value: string): string {
   return value.replace(
     /&(#x[\da-f]+|#\d+|[a-z]+);/gi,
     (entity, encoded: string) => {
-      if (encoded.startsWith("#x") || encoded.startsWith("#X")) {
+      if (/^#x/i.test(encoded)) {
         const codePoint = Number.parseInt(encoded.slice(2), 16);
 
-        return Number.isFinite(codePoint) &&
+        return Number.isInteger(codePoint) &&
           codePoint >= 0 &&
           codePoint <= 0x10ffff &&
           !(codePoint >= 0xd800 && codePoint <= 0xdfff)
@@ -69,7 +69,7 @@ function decodeHtmlEntities(value: string): string {
       if (encoded.startsWith("#")) {
         const codePoint = Number.parseInt(encoded.slice(1), 10);
 
-        return Number.isFinite(codePoint) &&
+        return Number.isInteger(codePoint) &&
           codePoint >= 0 &&
           codePoint <= 0x10ffff &&
           !(codePoint >= 0xd800 && codePoint <= 0xdfff)
@@ -104,6 +104,7 @@ function getAttribute(
   name: string,
 ): string | undefined {
   const escapedName = escapeRegExp(name);
+
   const expression = new RegExp(
     `(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`,
     "i",
@@ -122,7 +123,9 @@ function getMetaContent(
   const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
 
   for (const tag of metaTags) {
-    const attributes = tag.replace(/^<meta\b/i, "").replace(/\/?>$/, "");
+    const attributes = tag
+      .replace(/^<meta\b/i, "")
+      .replace(/\/?>$/, "");
 
     const key =
       getAttribute(attributes, "property") ??
@@ -131,17 +134,49 @@ function getMetaContent(
 
     if (
       key &&
-      keyNames.some((name) => key.toLowerCase() === name.toLowerCase())
+      keyNames.some(
+        (name) => key.toLowerCase() === name.toLowerCase(),
+      )
     ) {
       const content = getAttribute(attributes, "content");
 
-      if (content) {
+      if (content !== undefined && content.length > 0) {
         return content;
       }
     }
   }
 
   return undefined;
+}
+
+function getCharset(html: string): string {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
+
+  for (const tag of metaTags) {
+    const attributes = tag
+      .replace(/^<meta\b/i, "")
+      .replace(/\/?>$/, "");
+
+    const directCharset = getAttribute(attributes, "charset");
+
+    if (directCharset) {
+      return directCharset;
+    }
+
+    const contentType = getAttribute(attributes, "content");
+
+    if (contentType) {
+      const match = /charset\s*=\s*["']?([^;\s"']+)/i.exec(
+        contentType,
+      );
+
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+  }
+
+  return "UTF-8";
 }
 
 function getTitle(html: string): string | undefined {
@@ -153,11 +188,7 @@ function getTitle(html: string): string | undefined {
 function getHtmlLanguage(html: string): string | undefined {
   const match = /<html\b([^>]*)>/i.exec(html);
 
-  if (!match?.[1]) {
-    return undefined;
-  }
-
-  return getAttribute(match[1], "lang");
+  return match?.[1] ? getAttribute(match[1], "lang") : undefined;
 }
 
 function getLinkHref(
@@ -167,7 +198,10 @@ function getLinkHref(
   const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
 
   for (const tag of linkTags) {
-    const attributes = tag.replace(/^<link\b/i, "").replace(/\/?>$/, "");
+    const attributes = tag
+      .replace(/^<link\b/i, "")
+      .replace(/\/?>$/, "");
+
     const rel = getAttribute(attributes, "rel");
 
     if (
@@ -196,9 +230,14 @@ function resolveMetadataUrl(
   }
 
   try {
-    const parsed = baseUrl ? new URL(value, baseUrl) : new URL(value);
+    const parsed = baseUrl
+      ? new URL(value, baseUrl)
+      : new URL(value);
 
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
       return undefined;
     }
 
@@ -208,7 +247,6 @@ function resolveMetadataUrl(
 
     return parsed.href;
   } catch {
-    // Relative URLs cannot be resolved without a valid base URL.
     return undefined;
   }
 }
@@ -222,12 +260,12 @@ function extractOpenGraph(html: string): OpenGraphMetadata {
   const siteName = getMetaContent(html, ["og:site_name"]);
 
   return {
-    ...(title ? { title } : {}),
-    ...(description ? { description } : {}),
-    ...(image ? { image } : {}),
-    ...(url ? { url } : {}),
-    ...(type ? { type } : {}),
-    ...(siteName ? { siteName } : {}),
+    ...(title !== undefined ? { title } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(image !== undefined ? { image } : {}),
+    ...(url !== undefined ? { url } : {}),
+    ...(type !== undefined ? { type } : {}),
+    ...(siteName !== undefined ? { siteName } : {}),
   };
 }
 
@@ -240,20 +278,17 @@ function extractTwitter(html: string): TwitterMetadata {
   const creator = getMetaContent(html, ["twitter:creator"]);
 
   return {
-    ...(card ? { card } : {}),
-    ...(title ? { title } : {}),
-    ...(description ? { description } : {}),
-    ...(image ? { image } : {}),
-    ...(site ? { site } : {}),
-    ...(creator ? { creator } : {}),
+    ...(card !== undefined ? { card } : {}),
+    ...(title !== undefined ? { title } : {}),
+    ...(description !== undefined ? { description } : {}),
+    ...(image !== undefined ? { image } : {}),
+    ...(site !== undefined ? { site } : {}),
+    ...(creator !== undefined ? { creator } : {}),
   };
 }
 
 /**
  * Extract metadata from an HTML document.
- *
- * Missing optional HTML metadata is represented by empty strings,
- * matching the existing WebsiteMetadata contract.
  */
 export function extractWebsiteMetadata(
   html: string,
@@ -287,15 +322,22 @@ export function extractWebsiteMetadata(
     options.baseUrl,
   );
 
-  const imageUrl = resolveMetadataUrl(
+  const resolvedImage = resolveMetadataUrl(
     openGraph.image ?? twitter.image,
     options.baseUrl,
   );
 
-  const ogUrl = resolveMetadataUrl(openGraph.url, options.baseUrl);
+  const resolvedTwitterImage = resolveMetadataUrl(
+    twitter.image,
+    options.baseUrl,
+  );
+
+  const resolvedOpenGraphUrl = resolveMetadataUrl(
+    openGraph.url,
+    options.baseUrl,
+  );
 
   const metadata = {
-    // Required WebsiteMetadata fields
     url: options.baseUrl ?? "",
     title,
     description,
@@ -305,29 +347,17 @@ export function extractWebsiteMetadata(
     author: getMetaContent(html, ["author"]) ?? "",
     keywords: getMetaContent(html, ["keywords"]) ?? "",
     faviconUrl: faviconUrl ?? "",
+    charset: getCharset(html),
+    viewport: getMetaContent(html, ["viewport"]) ?? "",
 
-    // Required document metadata fields
-    charset:
-      getAttribute(
-        (html.match(/<meta\b[^>]*>/i)?.[0] ?? "").replace(
-          /^<meta\b/i,
-          "",
-        ),
-        "charset",
-      ) ??
-      getMetaContent(html, ["charset"]) ??
-      "UTF-8",
+    // Required by WebsiteMetadata in index.ts.
+    twitterCard: twitter.card ?? "",
 
-    viewport:
-      getMetaContent(html, ["viewport"]) ??
-      "",
-
-    // Explicitly type nested metadata to match the package contract.
     openGraph: {
       title: openGraph.title ?? "",
       description: openGraph.description ?? "",
-      image: imageUrl ?? "",
-      url: ogUrl ?? "",
+      image: resolvedImage ?? "",
+      url: resolvedOpenGraphUrl ?? "",
       type: openGraph.type ?? "",
       siteName: openGraph.siteName ?? "",
     },
@@ -336,7 +366,7 @@ export function extractWebsiteMetadata(
       card: twitter.card ?? "",
       title: twitter.title ?? "",
       description: twitter.description ?? "",
-      image: resolveMetadataUrl(twitter.image, options.baseUrl) ?? "",
+      image: resolvedTwitterImage ?? "",
       site: twitter.site ?? "",
       creator: twitter.creator ?? "",
     },
@@ -368,16 +398,19 @@ export function extractMetadata(
 }
 
 /**
- * Safely extracts a URL's origin for display purposes.
- *
- * This function does not fetch the URL or establish that it is safe
- * for server-side network access.
+ * Returns a safe HTTP(S) origin for display purposes.
+ * This function does not fetch the URL.
  */
-export function getMetadataOrigin(value: string): string | undefined {
+export function getMetadataOrigin(
+  value: string,
+): string | undefined {
   try {
     const parsed = new URL(value);
 
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
       return undefined;
     }
 
@@ -390,3 +423,4 @@ export function getMetadataOrigin(value: string): string | undefined {
     return undefined;
   }
 }
+```
