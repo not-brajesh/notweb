@@ -82,18 +82,7 @@ function getTagMatches(html: string, tagName: string): string[] {
   return html.match(expression) ?? [];
 }
 
-function getScriptBlocks(html: string): string[] {
-  return [
-    ...html.matchAll(
-      /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi,
-    ),
-  ].map((match) => {
-    const attributes = match[1] ?? "";
-    const content = match[2] ?? "";
 
-    return JSON.stringify({ attributes, content });
-  });
-}
 
 function getInlineScriptBytes(html: string): number {
   const scripts = [
@@ -245,10 +234,7 @@ export function analyzePerformance(
       "https://web.dev/articles/browser-level-image-lazy-loading",
   });
 
-  const externalScripts = scripts.filter((script) =>
-    hasAttribute(getAttributes(script), "src"),
-  );
-
+  
   addCheck({
     id: "performance-many-scripts",
     title: "Many script elements detected",
