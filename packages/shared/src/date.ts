@@ -1,21 +1,22 @@
-typescript
+```typescript
 /**
  * NOTWEB Date Utilities
  *
  * Shared date and timestamp helpers used across the platform.
- * All ISO timestamps are normalized to UTC.
+ * ISO timestamps are normalized to UTC.
  */
 
-/**
- * Accepts Date objects or date strings.
- */
 export type DateInput = Date | string | number;
 
 /**
- * Checks whether a value represents a valid date.
+ * Checks whether a value represents a valid date input.
  */
 export function isValidDate(value: unknown): value is DateInput {
-  if (!(value instanceof Date) && typeof value !== "string" && typeof value !== "number") {
+  if (
+    !(value instanceof Date) &&
+    typeof value !== "string" &&
+    typeof value !== "number"
+  ) {
     return false;
   }
 
@@ -25,10 +26,9 @@ export function isValidDate(value: unknown): value is DateInput {
 }
 
 /**
- * Converts a valid date input into a UTC ISO timestamp.
+ * Converts a valid date into a UTC ISO timestamp.
  *
- * Example:
- * 2026-10-23T10:30:00.000Z
+ * Example: 2026-10-23T10:30:00.000Z
  */
 export function toIsoTimestamp(value: DateInput = new Date()): string {
   const date = value instanceof Date ? value : new Date(value);
@@ -63,13 +63,17 @@ export function toUnixMilliseconds(value: DateInput): number {
 /**
  * Compares two dates.
  *
- * Returns:
- * - Negative number when firstDate is earlier.
- * - Zero when both represent the same instant.
- * - Positive number when firstDate is later.
+ * Negative: first date is earlier.
+ * Zero: both dates represent the same instant.
+ * Positive: first date is later.
  */
-export function compareDates(firstDate: DateInput, secondDate: DateInput): number {
-  return toUnixMilliseconds(firstDate) - toUnixMilliseconds(secondDate);
+export function compareDates(
+  firstDate: DateInput,
+  secondDate: DateInput,
+): number {
+  return (
+    toUnixMilliseconds(firstDate) - toUnixMilliseconds(secondDate)
+  );
 }
 
 /**
@@ -94,19 +98,28 @@ export function isDateBetween(
 /**
  * Adds a duration in milliseconds to a date.
  */
-export function addMilliseconds(value: DateInput, milliseconds: number): Date {
+export function addMilliseconds(
+  value: DateInput,
+  milliseconds: number,
+): Date {
   if (!Number.isFinite(milliseconds)) {
     throw new RangeError("The duration must be a finite number.");
   }
 
-  return new Date(toUnixMilliseconds(value) + milliseconds);
+  const result = toUnixMilliseconds(value) + milliseconds;
+
+  if (!Number.isFinite(result) || Math.abs(result) > 8.64e15) {
+    throw new RangeError("The resulting date is outside the supported range.");
+  }
+
+  return new Date(result);
 }
 
 /**
  * Formats a date for display.
  *
- * Defaults to the user's runtime locale and timezone.
- * Pass an explicit locale and timezone for consistent output.
+ * By default, the runtime's locale and timezone are used.
+ * Supply explicit options for consistent formatting.
  */
 export function formatDateTime(
   value: DateInput,
