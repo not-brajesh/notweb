@@ -20,6 +20,6 @@
     "@notweb/shared": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "workspace:^"
+    "typescript": "^5.9.2"
   }
 }
