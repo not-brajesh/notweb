@@ -11,378 +11,358 @@
 import type { WebsiteMetadata } from "./index.js";
 
 export interface MetadataExtractionOptions {
-  /** Base URL used to resolve relative URLs. */
+  /** Optional URL used to resolve relative canonical and image URLs. */
   baseUrl?: string;
-
-  /** Maximum accepted HTML length. Defaults to 5 MiB in characters. */
-  maxHtmlLength?: number;
 }
 
 export interface MetadataExtractionResult {
+  success: boolean;
   metadata: WebsiteMetadata;
-  warnings: string[];
+  errors: string[];
 }
 
-const DEFAULT_MAX_HTML_LENGTH = 5 * 1024 * 1024;
-
-function normalizeWhitespace(value: string | undefined): string {
-  return (value ?? "").replace(/\s+/g, " ").trim();
+interface OpenGraphMetadata {
+  title?: string;
+  description?: string;
+  image?: string;
+  url?: string;
+  type?: string;
+  siteName?: string;
 }
 
-function decodeBasicEntities(value: string): string {
+interface TwitterMetadata {
+  card?: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  site?: string;
+  creator?: string;
+}
+
+function decodeHtmlEntities(value: string): string {
   const namedEntities: Record<string, string> = {
     amp: "&",
-    quot: '"',
     apos: "'",
-    "#39": "'",
-    lt: "<",
     gt: ">",
+    lt: "<",
     nbsp: " ",
+    quot: '"',
+    copy: "©",
+    reg: "®",
+    trade: "™",
   };
 
   return value.replace(
-    /&(#x[0-9a-f]+|#\d+|amp|quot|apos|#39|lt|gt|nbsp);/gi,
-    (entity, name: string) => {
-      if (/^#x/i.test(name)) {
-        const codePoint = Number.parseInt(name.slice(2), 16);
+    /&(#x[\da-f]+|#\d+|[a-z]+);/gi,
+    (entity, encoded: string) => {
+      if (encoded.startsWith("#x") || encoded.startsWith("#X")) {
+        const codePoint = Number.parseInt(encoded.slice(2), 16);
 
-        return Number.isFinite(codePoint) &&
-          codePoint >= 0 &&
+        return Number.isFinite(codePoint) && codePoint >= 0 &&
           codePoint <= 0x10ffff
           ? String.fromCodePoint(codePoint)
           : entity;
       }
 
-      if (name.startsWith("#")) {
-        const codePoint = Number.parseInt(name.slice(1), 10);
+      if (encoded.startsWith("#")) {
+        const codePoint = Number.parseInt(encoded.slice(1), 10);
 
-        return Number.isFinite(codePoint) &&
-          codePoint >= 0 &&
+        return Number.isFinite(codePoint) && codePoint >= 0 &&
           codePoint <= 0x10ffff
           ? String.fromCodePoint(codePoint)
           : entity;
       }
 
-      return namedEntities[name.toLowerCase()] ?? entity;
+      return namedEntities[encoded.toLowerCase()] ?? entity;
     },
   );
 }
 
-function getAttribute(
-  tag: string,
-  attributeName: string,
-): string | undefined {
-  const escapedName = attributeName.replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\$&",
-  );
-
-  const pattern = new RegExp(
-    `(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
-    "i",
-  );
-
-  const match = tag.match(pattern);
-  const rawValue = match?.[1] ?? match?.[2] ?? match?.[3];
-
-  if (rawValue === undefined) {
+function cleanText(value: string | undefined): string | undefined {
+  if (value === undefined) {
     return undefined;
   }
 
-  return normalizeWhitespace(decodeBasicEntities(rawValue));
+  const cleaned = decodeHtmlEntities(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getAttribute(
+  attributes: string,
+  name: string,
+): string | undefined {
+  const escapedName = escapeRegExp(name);
+  const expression = new RegExp(
+    `(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`,
+    "i",
+  );
+
+  const match = expression.exec(attributes);
+  const value = match?.[1] ?? match?.[2] ?? match?.[3];
+
+  return cleanText(value);
 }
 
 function getMetaContent(
   html: string,
-  attributeName: "name" | "property",
-  expectedValue: string,
+  keyNames: readonly string[],
 ): string | undefined {
   const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
 
   for (const tag of metaTags) {
-    const actualValue = getAttribute(tag, attributeName);
+    const attributes = tag.replace(/^<meta\b/i, "").replace(/\/?>$/, "");
+    const key =
+      getAttribute(attributes, "property") ??
+      getAttribute(attributes, "name") ??
+      getAttribute(attributes, "itemprop");
 
-    if (actualValue?.toLowerCase() !== expectedValue.toLowerCase()) {
-      continue;
-    }
+    if (key && keyNames.some((name) => key.toLowerCase() === name.toLowerCase())) {
+      const content = getAttribute(attributes, "content");
 
-    const content = getAttribute(tag, "content");
-
-    if (content) {
-      return content;
+      if (content) {
+        return content;
+      }
     }
   }
 
   return undefined;
 }
 
-function getMetaByName(
-  html: string,
-  name: string,
-): string | undefined {
-  return getMetaContent(html, "name", name);
-}
-
-function getOpenGraph(
-  html: string,
-  property: string,
-): string | undefined {
-  return getMetaContent(html, "property", property);
-}
-
-function getTwitterMeta(
-  html: string,
-  name: string,
-): string | undefined {
-  return getMetaByName(html, `twitter:${name}`);
-}
-
 function getTitle(html: string): string | undefined {
-  const match = html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i);
+  const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html);
+  return cleanText(match?.[1]);
+}
+
+function getHtmlLanguage(html: string): string | undefined {
+  const match = /<html\b([^>]*)>/i.exec(html);
 
   if (!match?.[1]) {
     return undefined;
   }
 
-  const title = normalizeWhitespace(
-    decodeBasicEntities(match[1].replace(/<[^>]*>/g, "")),
-  );
-
-  return title || undefined;
+  return getAttribute(match[1], "lang");
 }
 
-function getLinkHrefByRel(
+function getLinkHref(
   html: string,
-  acceptedRelValues: readonly string[],
+  relValue: string,
 ): string | undefined {
   const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
 
   for (const tag of linkTags) {
-    const rel = getAttribute(tag, "rel")
-      ?.toLowerCase()
-      .split(/\s+/);
+    const attributes = tag.replace(/^<link\b/i, "").replace(/\/?>$/, "");
+    const rel = getAttribute(attributes, "rel");
 
-    if (!rel?.some((value) => acceptedRelValues.includes(value))) {
-      continue;
-    }
+    if (
+      rel
+        ?.toLowerCase()
+        .split(/\s+/)
+        .includes(relValue.toLowerCase())
+    ) {
+      const href = getAttribute(attributes, "href");
 
-    const href = getAttribute(tag, "href");
-
-    if (href) {
-      return href;
+      if (href) {
+        return href;
+      }
     }
   }
 
   return undefined;
 }
 
-/**
- * Resolve a URL without making a network request.
- *
- * Only HTTP and HTTPS URLs are accepted.
- * This does not perform SSRF protection for future network requests.
- */
-function resolveHttpUrl(
+function resolveMetadataUrl(
   value: string | undefined,
   baseUrl: string | undefined,
-  warnings: string[],
-  fieldName: string,
 ): string | undefined {
   if (!value) {
     return undefined;
   }
 
   try {
-    const resolved = baseUrl
-      ? new URL(value, baseUrl)
-      : new URL(value);
+    const parsed = baseUrl ? new URL(value, baseUrl) : new URL(value);
 
-    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
-      warnings.push(`${fieldName} uses an unsupported URL protocol.`);
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
       return undefined;
     }
 
-    if (resolved.username || resolved.password) {
-      warnings.push(`${fieldName} must not contain URL credentials.`);
+    if (parsed.username || parsed.password) {
       return undefined;
     }
 
-    return resolved.href;
+    return parsed.href;
   } catch {
-    warnings.push(
-      `${fieldName} could not be resolved. Provide a valid absolute URL or baseUrl.`,
-    );
-
+    // Relative URLs cannot be resolved without a valid base URL.
     return undefined;
   }
 }
 
-function getHtmlAttribute(
-  html: string,
-  attributeName: string,
-): string | undefined {
-  const htmlTag = html.match(/<html\b[^>]*>/i)?.[0];
+function extractOpenGraph(html: string): OpenGraphMetadata {
+  const title = getMetaContent(html, ["og:title"]);
+  const description = getMetaContent(html, ["og:description"]);
+  const image = getMetaContent(html, ["og:image", "og:image:url"]);
+  const url = getMetaContent(html, ["og:url"]);
+  const type = getMetaContent(html, ["og:type"]);
+  const siteName = getMetaContent(html, ["og:site_name"]);
 
-  if (!htmlTag) {
-    return undefined;
-  }
+  return {
+    ...(title ? { title } : {}),
+    ...(description ? { description } : {}),
+    ...(image ? { image } : {}),
+    ...(url ? { url } : {}),
+    ...(type ? { type } : {}),
+    ...(siteName ? { siteName } : {}),
+  };
+}
 
-  return getAttribute(htmlTag, attributeName);
+function extractTwitter(html: string): TwitterMetadata {
+  const card = getMetaContent(html, ["twitter:card"]);
+  const title = getMetaContent(html, ["twitter:title"]);
+  const description = getMetaContent(html, ["twitter:description"]);
+  const image = getMetaContent(html, ["twitter:image"]);
+  const site = getMetaContent(html, ["twitter:site"]);
+  const creator = getMetaContent(html, ["twitter:creator"]);
+
+  return {
+    ...(card ? { card } : {}),
+    ...(title ? { title } : {}),
+    ...(description ? { description } : {}),
+    ...(image ? { image } : {}),
+    ...(site ? { site } : {}),
+    ...(creator ? { creator } : {}),
+  };
 }
 
 /**
- * Extract website metadata from an HTML document.
+ * Extract metadata from an HTML document.
  *
- * This is a lightweight metadata extractor, not a complete HTML5 parser.
+ * The returned structure always contains the required WebsiteMetadata
+ * fields. Missing optional HTML metadata is represented by empty strings
+ * or empty objects, matching the existing package contract.
  */
 export function extractWebsiteMetadata(
   html: string,
   options: MetadataExtractionOptions = {},
 ): MetadataExtractionResult {
-  const warnings: string[] = [];
+  const errors: string[] = [];
 
-  const maxHtmlLength =
-    options.maxHtmlLength ?? DEFAULT_MAX_HTML_LENGTH;
-
-  if (!Number.isSafeInteger(maxHtmlLength) || maxHtmlLength < 1) {
-    throw new RangeError(
-      "maxHtmlLength must be a positive safe integer.",
-    );
-  }
-
-  if (html.length > maxHtmlLength) {
-    throw new RangeError(
-      `HTML exceeds the maximum allowed length of ${maxHtmlLength} characters.`,
-    );
-  }
-
-  const rawCanonicalUrl = getLinkHrefByRel(html, ["canonical"]);
-  const rawFaviconUrl = getLinkHrefByRel(html, [
-    "icon",
-    "shortcut",
-    "apple-touch-icon",
-  ]);
-
-  const canonicalUrl = resolveHttpUrl(
-    rawCanonicalUrl,
-    options.baseUrl,
-    warnings,
-    "Canonical URL",
-  );
-
-  const faviconUrl = resolveHttpUrl(
-    rawFaviconUrl,
-    options.baseUrl,
-    warnings,
-    "Favicon URL",
-  );
-
-  const rawDocumentUrl = options.baseUrl;
-
-  const documentUrl = resolveHttpUrl(
-    rawDocumentUrl,
-    undefined,
-    warnings,
-    "Document URL",
-  );
+  const openGraph = extractOpenGraph(html);
+  const twitter = extractTwitter(html);
 
   const title =
-    getOpenGraph(html, "og:title") ??
-    getTwitterMeta(html, "title") ??
-    getTitle(html);
+    getMetaContent(html, ["og:title", "twitter:title"]) ??
+    getTitle(html) ??
+    "";
 
   const description =
-    getMetaByName(html, "description") ??
-    getOpenGraph(html, "og:description") ??
-    getTwitterMeta(html, "description");
+    getMetaContent(html, ["description", "og:description"]) ??
+    getMetaContent(html, ["twitter:description"]) ??
+    "";
 
-  const charset =
-    html.match(/<meta\b[^>]*\bcharset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))/i)
-      ?.[1] ??
-    html.match(/<meta\b[^>]*\bcharset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))/i)
-      ?.[2] ??
-    html.match(/<meta\b[^>]*\bcharset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))/i)
-      ?.[3];
+  const canonicalUrl = resolveMetadataUrl(
+    getLinkHref(html, "canonical"),
+    options.baseUrl,
+  );
 
-  const viewport = getMetaByName(html, "viewport");
+  const faviconUrl = resolveMetadataUrl(
+    getLinkHref(html, "icon") ??
+      getLinkHref(html, "shortcut icon"),
+    options.baseUrl,
+  );
 
-  const twitterCard =
-    getTwitterMeta(html, "card") ??
-    getOpenGraph(html, "type");
+  const imageUrl = resolveMetadataUrl(
+    openGraph.image ?? twitter.image,
+    options.baseUrl,
+  );
 
-  const openGraph = {
-    title: getOpenGraph(html, "og:title"),
-    description: getOpenGraph(html, "og:description"),
-    image: resolveHttpUrl(
-      getOpenGraph(html, "og:image"),
-      options.baseUrl,
-      warnings,
-      "Open Graph image URL",
-    ),
-    url: resolveHttpUrl(
-      getOpenGraph(html, "og:url"),
-      options.baseUrl,
-      warnings,
-      "Open Graph URL",
-    ),
-    type: getOpenGraph(html, "og:type"),
-    siteName: getOpenGraph(html, "og:site_name"),
-  };
+  const ogUrl = resolveMetadataUrl(openGraph.url, options.baseUrl);
 
-  const twitter = {
-    card: getTwitterMeta(html, "card"),
-    title: getTwitterMeta(html, "title"),
-    description: getTwitterMeta(html, "description"),
-    image: resolveHttpUrl(
-      getTwitterMeta(html, "image"),
-      options.baseUrl,
-      warnings,
-      "Twitter image URL",
-    ),
-    site: getTwitterMeta(html, "site"),
-  };
-
-  /*
-   * Keep the metadata contract aligned with the existing WebsiteMetadata
-   * interface. Required string fields receive safe defaults.
-   */
   const metadata = {
-    url: documentUrl ?? "",
-    title: title ?? "",
-    description: description ?? "",
+    url: options.baseUrl ?? "",
+    title,
+    description,
     canonicalUrl: canonicalUrl ?? "",
-    language: getHtmlAttribute(html, "lang") ?? "",
-    charset: charset?.trim() ?? "",
-    viewport: viewport ?? "",
-    robots: getMetaByName(html, "robots") ?? "",
-    author: getMetaByName(html, "author") ?? "",
-    keywords: getMetaByName(html, "keywords") ?? "",
+    language: getHtmlLanguage(html) ?? "",
+    robots: getMetaContent(html, ["robots"]) ?? "",
+    author: getMetaContent(html, ["author"]) ?? "",
+    keywords: getMetaContent(html, ["keywords"]) ?? "",
     faviconUrl: faviconUrl ?? "",
-    twitterCard: twitterCard ?? "",
-    openGraph,
-    twitter,
+    openGraph: {
+      title: openGraph.title ?? "",
+      description: openGraph.description ?? "",
+      image: imageUrl ?? "",
+      url: ogUrl ?? "",
+      type: openGraph.type ?? "",
+      siteName: openGraph.siteName ?? "",
+    },
+    twitter: {
+      card: twitter.card ?? "",
+      title: twitter.title ?? "",
+      description: twitter.description ?? "",
+      image: resolveMetadataUrl(twitter.image, options.baseUrl) ?? "",
+      site: twitter.site ?? "",
+      creator: twitter.creator ?? "",
+    },
   } satisfies WebsiteMetadata;
 
-  if (!metadata.url) {
-    warnings.push(
-      "Document URL was not provided. Pass baseUrl to populate it.",
-    );
+  if (!title) {
+    errors.push("The HTML document does not contain a title.");
   }
 
-  if (!metadata.title) {
-    warnings.push("Page title was not found.");
-  }
-
-  if (!metadata.description) {
-    warnings.push("Meta description was not found.");
-  }
-
-  if (!metadata.canonicalUrl) {
-    warnings.push("Canonical URL was not found or could not be resolved.");
+  if (!description) {
+    errors.push("The HTML document does not contain a meta description.");
   }
 
   return {
+    success: true,
     metadata,
-    warnings,
+    errors,
   };
+}
+
+/**
+ * Convenience function for callers that only need the metadata object.
+ */
+export function extractMetadata(
+  html: string,
+  options: MetadataExtractionOptions = {},
+): WebsiteMetadata {
+  return extractWebsiteMetadata(html, options).metadata;
+}
+
+/**
+ * Safely extracts a URL's origin for display purposes.
+ *
+ * This function does not fetch the URL or establish that it is safe
+ * for server-side network access.
+ */
+export function getMetadataOrigin(value: string): string | undefined {
+  try {
+    const parsed = new URL(value);
+
+    if (
+      parsed.protocol !== "http:" &&
+      parsed.protocol !== "https:"
+    ) {
+      return undefined;
+    }
+
+    if (parsed.username || parsed.password) {
+      return undefined;
+    }
+
+    return parsed.origin;
+  } catch {
+    return undefined;
+  }
 }
