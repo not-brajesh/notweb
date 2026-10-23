@@ -1,8 +1,8 @@
 /**
  * NOTWEB Shared Package
  *
- * Common types and utilities used across NOTWEB applications
- * and packages.
+ * Public entry point for shared types, constants, errors,
+ * validation utilities, and ID generation.
  */
 
 // -----------------------------------------------------------------------------
@@ -16,7 +16,7 @@ export const NOTWEB_VERSION = "0.1.0";
 export const NOTWEB_TAGLINE = "Beyond Websites. Beyond Limits.";
 
 // -----------------------------------------------------------------------------
-// Result types
+// Common types
 // -----------------------------------------------------------------------------
 
 export interface AppError {
@@ -34,10 +34,6 @@ export type Result<T, E = AppError> =
       success: false;
       error: E;
     };
-
-// -----------------------------------------------------------------------------
-// Common identifiers
-// -----------------------------------------------------------------------------
 
 export type Brand<T, Name extends string> = T & {
   readonly __brand: Name;
@@ -105,7 +101,7 @@ export interface JobMetadata {
 }
 
 // -----------------------------------------------------------------------------
-// Logging
+// Logging types
 // -----------------------------------------------------------------------------
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -118,12 +114,78 @@ export interface LogEntry {
 }
 
 // -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
+export {
+  APP_NAME,
+  APP_VERSION,
+  APP_TAGLINE,
+  DEFAULT_LOCALE,
+  DEFAULT_TIMEZONE,
+  PROJECT_NAME_MIN_LENGTH,
+  PROJECT_NAME_MAX_LENGTH,
+  MAX_WEBSITE_URL_LENGTH,
+  SUPPORTED_URL_PROTOCOLS,
+  PROJECT_STATUSES,
+  JOB_STATUSES,
+  PROJECT_TARGETS,
+  LOG_LEVELS,
+  DEFAULT_LOG_LEVEL,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  MAX_REQUEST_TIMEOUT_MS,
+  DEFAULT_MAX_REDIRECTS,
+  DEFAULT_MAX_RESPONSE_SIZE_BYTES,
+} from "./constants.js";
+
+export type {
+  ProjectStatusValue,
+  JobStatusValue,
+  ProjectTargetValue,
+  LogLevelValue,
+} from "./constants.js";
+
+// -----------------------------------------------------------------------------
+// Error handling
+// -----------------------------------------------------------------------------
+
+export {
+  NotwebError,
+  ValidationError,
+  NotFoundError,
+  TimeoutError,
+  normalizeError,
+  tryCatch,
+} from "./errors.js";
+
+// -----------------------------------------------------------------------------
+// Validation utilities
+// -----------------------------------------------------------------------------
+
+export {
+  validateProjectName,
+  validateWebsiteUrl,
+  validateEmail,
+  validatePositiveInteger,
+} from "./validation.js";
+
+export type { ValidationResult } from "./validation.js";
+
+// -----------------------------------------------------------------------------
+// ID utilities
+// -----------------------------------------------------------------------------
+
+export {
+  createProjectId,
+  createJobId,
+  createUserId,
+  isValidUuid,
+} from "./ids.js";
+
+// -----------------------------------------------------------------------------
 // Utility functions
 // -----------------------------------------------------------------------------
 
-/**
- * Creates a consistent error object.
- */
 export function createAppError(
   code: string,
   message: string,
@@ -136,9 +198,6 @@ export function createAppError(
   };
 }
 
-/**
- * Wraps successful data in a Result.
- */
 export function success<T>(data: T): Result<T> {
   return {
     success: true,
@@ -146,9 +205,6 @@ export function success<T>(data: T): Result<T> {
   };
 }
 
-/**
- * Wraps an error in a Result.
- */
 export function failure<E = AppError>(error: E): Result<never, E> {
   return {
     success: false,
@@ -156,16 +212,10 @@ export function failure<E = AppError>(error: E): Result<never, E> {
   };
 }
 
-/**
- * Returns the current timestamp in ISO 8601 format.
- */
 export function getCurrentTimestamp(): string {
   return new Date().toISOString();
 }
 
-/**
- * Clamps a number to an inclusive range.
- */
 export function clamp(value: number, min: number, max: number): number {
   if (min > max) {
     throw new RangeError("Minimum value cannot be greater than maximum value.");
@@ -174,16 +224,10 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Checks whether a value is a non-empty string.
- */
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-/**
- * Calculates a safe progress percentage.
- */
 export function calculateProgress(
   completed: number,
   total: number,
