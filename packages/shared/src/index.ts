@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 // Package metadata
 // -----------------------------------------------------------------------------
-
+export * from "./throttle.js";
 export const NOTWEB_NAME = "NOTWEB";
 export const NOTWEB_VERSION = "0.1.0";
 export * from "./debounce.js";
