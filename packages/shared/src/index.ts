@@ -1,249 +1,161 @@
+
 /**
- * NOTWEB Shared Package
+ * NOTWEB Date Utilities
  *
- * Public entry point for shared types, constants, errors,
- * validation utilities, and ID generation.
+ * Shared date and timestamp helpers used across the platform.
+ * ISO timestamps are normalized to UTC.
  */
 
-// -----------------------------------------------------------------------------
-// Application metadata
-// -----------------------------------------------------------------------------
+export type DateInput = Date | string | number;
 
-export const NOTWEB_NAME = "NOTWEB";
+/**
+ * Checks whether a value represents a valid date input.
+ */
+export function isValidDate(value: unknown): value is DateInput {
+  if (
+    !(value instanceof Date) &&
+    typeof value !== "string" &&
+    typeof value !== "number"
+  ) {
+    return false;
+  }
 
-export const NOTWEB_VERSION = "0.1.0";
+  const date = value instanceof Date ? value : new Date(value);
 
-export const NOTWEB_TAGLINE = "Beyond Websites. Beyond Limits.";
-
-// -----------------------------------------------------------------------------
-// Common types
-// -----------------------------------------------------------------------------
-
-export interface AppError {
-  code: string;
-  message: string;
-  details?: unknown;
-}
-export * from "./date.js";
-export type Result<T, E = AppError> =
-  | {
-      success: true;
-      data: T;
-    }
-  | {
-      success: false;
-      error: E;
-    };
-
-export type Brand<T, Name extends string> = T & {
-  readonly __brand: Name;
-};
-
-export type ProjectId = Brand<string, "ProjectId">;
-
-export type JobId = Brand<string, "JobId">;
-
-export type UserId = Brand<string, "UserId">;
-
-// -----------------------------------------------------------------------------
-// Project types
-// -----------------------------------------------------------------------------
-
-export type ProjectStatus =
-  | "draft"
-  | "analyzing"
-  | "ready"
-  | "processing"
-  | "completed"
-  | "failed";
-
-export type ProjectTarget =
-  | "responsive-web"
-  | "pwa"
-  | "browser-extension"
-  | "desktop-app"
-  | "mobile-app";
-
-export interface ProjectMetadata {
-  id: ProjectId;
-  name: string;
-  sourceUrl: string;
-  status: ProjectStatus;
-  targets: ProjectTarget[];
-  createdAt: string;
-  updatedAt: string;
+  return !Number.isNaN(date.getTime());
 }
 
-// -----------------------------------------------------------------------------
-// Job types
-// -----------------------------------------------------------------------------
+/**
+ * Converts a valid date into a UTC ISO timestamp.
+ *
+ * Example: 2026-10-23T10:30:00.000Z
+ */
+export function toIsoTimestamp(value: DateInput = new Date()): string {
+  const date = value instanceof Date ? value : new Date(value);
 
-export type JobStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError("Cannot convert an invalid date to an ISO timestamp.");
+  }
 
-export interface JobProgress {
-  completed: number;
-  total: number;
-  percentage: number;
-  message?: string;
+  return date.toISOString();
 }
 
-export interface JobMetadata {
-  id: JobId;
-  status: JobStatus;
-  progress: JobProgress;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// -----------------------------------------------------------------------------
-// Logging types
-// -----------------------------------------------------------------------------
-
-export type LogLevel = "debug" | "info" | "warn" | "error";
-
-export interface LogEntry {
-  level: LogLevel;
-  message: string;
-  timestamp: string;
-  context?: Record<string, unknown>;
-}
-
-// -----------------------------------------------------------------------------
-// Constants
-// -----------------------------------------------------------------------------
-
-export {
-  APP_NAME,
-  APP_VERSION,
-  APP_TAGLINE,
-  DEFAULT_LOCALE,
-  DEFAULT_TIMEZONE,
-  PROJECT_NAME_MIN_LENGTH,
-  PROJECT_NAME_MAX_LENGTH,
-  MAX_WEBSITE_URL_LENGTH,
-  SUPPORTED_URL_PROTOCOLS,
-  PROJECT_STATUSES,
-  JOB_STATUSES,
-  PROJECT_TARGETS,
-  LOG_LEVELS,
-  DEFAULT_LOG_LEVEL,
-  DEFAULT_REQUEST_TIMEOUT_MS,
-  MAX_REQUEST_TIMEOUT_MS,
-  DEFAULT_MAX_REDIRECTS,
-  DEFAULT_MAX_RESPONSE_SIZE_BYTES,
-} from "./constants.js";
-
-export type {
-  ProjectStatusValue,
-  JobStatusValue,
-  ProjectTargetValue,
-  LogLevelValue,
-} from "./constants.js";
-
-// -----------------------------------------------------------------------------
-// Error handling
-// -----------------------------------------------------------------------------
-
-export {
-  NotwebError,
-  ValidationError,
-  NotFoundError,
-  TimeoutError,
-  normalizeError,
-  tryCatch,
-} from "./errors.js";
-
-// -----------------------------------------------------------------------------
-// Validation utilities
-// -----------------------------------------------------------------------------
-
-export {
-  validateProjectName,
-  validateWebsiteUrl,
-  validateEmail,
-  validatePositiveInteger,
-} from "./validation.js";
-
-export type { ValidationResult } from "./validation.js";
-
-// -----------------------------------------------------------------------------
-// ID utilities
-// -----------------------------------------------------------------------------
-
-export {
-  createProjectId,
-  createJobId,
-  createUserId,
-  isValidUuid,
-} from "./ids.js";
-
-// -----------------------------------------------------------------------------
-// Utility functions
-// -----------------------------------------------------------------------------
-
-export function createAppError(
-  code: string,
-  message: string,
-  details?: unknown,
-): AppError {
-  return {
-    code,
-    message,
-    ...(details === undefined ? {} : { details }),
-  };
-}
-
-export function success<T>(data: T): Result<T> {
-  return {
-    success: true,
-    data,
-  };
-}
-
-export function failure<E = AppError>(error: E): Result<never, E> {
-  return {
-    success: false,
-    error,
-  };
-}
-
+/**
+ * Returns the current UTC timestamp.
+ */
 export function getCurrentTimestamp(): string {
   return new Date().toISOString();
 }
 
-export function clamp(value: number, min: number, max: number): number {
-  if (min > max) {
-    throw new RangeError("Minimum value cannot be greater than maximum value.");
+/**
+ * Converts a date into Unix time in milliseconds.
+ */
+export function toUnixMilliseconds(value: DateInput): number {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError("Cannot convert an invalid date to Unix milliseconds.");
   }
 
-  return Math.min(Math.max(value, min), max);
+  return date.getTime();
 }
 
-export function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-export function calculateProgress(
-  completed: number,
-  total: number,
+/**
+ * Compares two dates.
+ *
+ * Negative: first date is earlier.
+ * Zero: both dates represent the same instant.
+ * Positive: first date is later.
+ */
+export function compareDates(
+  firstDate: DateInput,
+  secondDate: DateInput,
 ): number {
-  if (
-    !Number.isFinite(completed) ||
-    !Number.isFinite(total) ||
-    completed < 0 ||
-    total < 0
-  ) {
-    return 0;
+  return (
+    toUnixMilliseconds(firstDate) - toUnixMilliseconds(secondDate)
+  );
+}
+
+/**
+ * Checks whether a date falls between two dates, inclusive.
+ */
+export function isDateBetween(
+  value: DateInput,
+  startDate: DateInput,
+  endDate: DateInput,
+): boolean {
+  const timestamp = toUnixMilliseconds(value);
+  const start = toUnixMilliseconds(startDate);
+  const end = toUnixMilliseconds(endDate);
+
+  if (start > end) {
+    throw new RangeError("The start date must not be after the end date.");
   }
 
-  if (total === 0) {
-    return 0;
+  return timestamp >= start && timestamp <= end;
+}
+
+/**
+ * Adds a duration in milliseconds to a date.
+ */
+export function addMilliseconds(
+  value: DateInput,
+  milliseconds: number,
+): Date {
+  if (!Number.isFinite(milliseconds)) {
+    throw new RangeError("The duration must be a finite number.");
   }
 
-  return Math.round(clamp((completed / total) * 100, 0, 100));
+  const result = toUnixMilliseconds(value) + milliseconds;
+
+  if (!Number.isFinite(result) || Math.abs(result) > 8.64e15) {
+    throw new RangeError("The resulting date is outside the supported range.");
+  }
+
+  return new Date(result);
+}
+
+/**
+ * Formats a date for display.
+ *
+ * By default, the runtime's locale and timezone are used.
+ * Supply explicit options for consistent formatting.
+ */
+export function formatDateTime(
+  value: DateInput,
+  options: {
+    locale?: string;
+    timeZone?: string;
+    dateStyle?: "full" | "long" | "medium" | "short";
+    timeStyle?: "full" | "long" | "medium" | "short";
+  } = {},
+): string {
+  const {
+    locale,
+    timeZone,
+    dateStyle = "medium",
+    timeStyle = "short",
+  } = options;
+
+  const date = new Date(toUnixMilliseconds(value));
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle,
+    timeStyle,
+    ...(timeZone === undefined ? {} : { timeZone }),
+  }).format(date);
+}
+
+/**
+ * Checks whether a date is in the past.
+ */
+export function isPastDate(value: DateInput): boolean {
+  return toUnixMilliseconds(value) < Date.now();
+}
+
+/**
+ * Checks whether a date is in the future.
+ */
+export function isFutureDate(value: DateInput): boolean {
+  return toUnixMilliseconds(value) > Date.now();
 }
