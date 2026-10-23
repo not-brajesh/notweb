@@ -3,419 +3,280 @@
  * NOTWEB — Website Metadata Extractor
  *
  * Extracts SEO and social-sharing metadata from HTML.
- *
  * This module only parses HTML. It does not make network requests.
  */
 
 import type { WebsiteMetadata } from "./index.js";
 
-/* -------------------------------------------------------------------------- */
-/*                                    Types                                   */
-/* -------------------------------------------------------------------------- */
-
 export interface MetadataExtractionOptions {
-  /** URL of the page that produced this HTML. */
-  pageUrl: string;
-
-  /** Optional final URL after redirects. */
-  finalUrl?: string;
-
-  /** Maximum HTML size accepted by this parser. */
+  /** Base URL used to resolve relative canonical URLs. */
+  baseUrl?: string;
+  /** Maximum HTML length accepted by the extractor. */
   maxHtmlLength?: number;
 }
 
 export interface MetadataExtractionResult {
-  success: boolean;
-  metadata: WebsiteMetadata | null;
-  errors: string[];
+  metadata: WebsiteMetadata;
+  warnings: string[];
 }
 
 const DEFAULT_MAX_HTML_LENGTH = 5 * 1024 * 1024;
 
-/* -------------------------------------------------------------------------- */
-/*                               Helper Functions                             */
-/* -------------------------------------------------------------------------- */
+function normalizeWhitespace(value: string | null | undefined): string {
+  return (value ?? "").replace(/\s+/g, " ").trim();
+}
 
-/**
- * Decodes common HTML entities without relying on browser-only APIs.
- * This is intentionally lightweight, not a complete HTML parser.
- */
-function decodeHtmlEntities(value: string): string {
-  const namedEntities: Record<string, string> = {
+function getAttribute(
+  tag: string,
+  attributeName: string,
+): string | undefined {
+  const escapedName = attributeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `\\b${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
+    "i",
+  );
+
+  const match = tag.match(pattern);
+  const value = match?.[1] ?? match?.[2] ?? match?.[3];
+
+  return value === undefined ? undefined : normalizeWhitespace(value);
+}
+
+function decodeBasicEntities(value: string): string {
+  const entities: Record<string, string> = {
     amp: "&",
-    apos: "'",
     quot: '"',
+    apos: "'",
+    "#39": "'",
     lt: "<",
     gt: ">",
-    nbsp: "\u00a0",
-    copy: "\u00a9",
-    reg: "\u00ae",
-    trade: "\u2122",
+    nbsp: " ",
   };
 
   return value.replace(
-    /&(#x[\da-f]+|#\d+|[a-z]+);/gi,
-    (match: string, entity: string): string => {
-      if (entity.startsWith("#x") || entity.startsWith("#X")) {
-        const codePoint = Number.parseInt(entity.slice(2), 16);
-
-        return isValidCodePoint(codePoint)
+    /&(#x[0-9a-f]+|#\d+|amp|quot|apos|#39|lt|gt|nbsp);/gi,
+    (entity, name: string) => {
+      if (name.startsWith("#x") || name.startsWith("#X")) {
+        const codePoint = Number.parseInt(name.slice(2), 16);
+        return Number.isFinite(codePoint) && codePoint <= 0x10ffff
           ? String.fromCodePoint(codePoint)
-          : match;
+          : entity;
       }
 
-      if (entity.startsWith("#")) {
-        const codePoint = Number.parseInt(entity.slice(1), 10);
-
-        return isValidCodePoint(codePoint)
+      if (name.startsWith("#")) {
+        const codePoint = Number.parseInt(name.slice(1), 10);
+        return Number.isFinite(codePoint) && codePoint <= 0x10ffff
           ? String.fromCodePoint(codePoint)
-          : match;
+          : entity;
       }
 
-      return namedEntities[entity.toLowerCase()] ?? match;
+      return entities[name.toLowerCase()] ?? entity;
     },
   );
 }
 
-function isValidCodePoint(value: number): boolean {
-  return (
-    Number.isInteger(value) &&
-    value >= 0 &&
-    value <= 0x10ffff &&
-    !(value >= 0xd800 && value <= 0xdfff)
+function findMetaContent(
+  html: string,
+  predicate: (tag: string) => boolean,
+): string | undefined {
+  const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
+
+  for (const tag of tags) {
+    if (!predicate(tag)) continue;
+
+    const content = getAttribute(tag, "content");
+    if (content) return decodeBasicEntities(content);
+  }
+
+  return undefined;
+}
+
+function findMetaByName(
+  html: string,
+  name: string,
+): string | undefined {
+  return findMetaContent(html, (tag) => {
+    const tagName = getAttribute(tag, "name");
+    return tagName?.toLowerCase() === name.toLowerCase();
+  });
+}
+
+function findOpenGraph(
+  html: string,
+  property: string,
+): string | undefined {
+  return findMetaContent(html, (tag) => {
+    const tagProperty = getAttribute(tag, "property");
+    return tagProperty?.toLowerCase() === property.toLowerCase();
+  });
+}
+
+function findTwitterMeta(
+  html: string,
+  name: string,
+): string | undefined {
+  return findMetaContent(html, (tag) => {
+    const tagName = getAttribute(tag, "name");
+    return tagName?.toLowerCase() === `twitter:${name}`.toLowerCase();
+  });
+}
+
+function findTitle(html: string): string | undefined {
+  const match = html.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i);
+
+  if (!match?.[1]) return undefined;
+
+  const title = normalizeWhitespace(
+    decodeBasicEntities(match[1].replace(/<[^>]*>/g, "")),
   );
+
+  return title || undefined;
 }
 
-function normalizeText(value: string): string {
-  return decodeHtmlEntities(value)
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+function findCanonicalUrl(html: string): string | undefined {
+  const links = html.match(/<link\b[^>]*>/gi) ?? [];
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
+  for (const link of links) {
+    const rel = getAttribute(link, "rel")
+      ?.toLowerCase()
+      .split(/\s+/);
 
-    return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      url.hostname.length > 0 &&
-      url.username.length === 0 &&
-      url.password.length === 0
-    );
-  } catch {
-    return false;
-  }
-}
+    if (!rel?.includes("canonical")) continue;
 
-/**
- * Resolves a relative metadata URL against the page URL.
- * Unsafe protocols and URLs containing credentials are rejected.
- */
-function resolveMetadataUrl(
-  value: string | null,
-  baseUrl: string,
-): string | null {
-  if (!value) {
-    return null;
+    const href = getAttribute(link, "href");
+    if (href) return href;
   }
 
-  try {
-    const resolved = new URL(value, baseUrl);
+  return undefined;
+}
 
-    if (
-      (resolved.protocol !== "http:" && resolved.protocol !== "https:") ||
-      !resolved.hostname ||
-      resolved.username ||
-      resolved.password
-    ) {
-      return null;
+function resolveCanonicalUrl(
+  canonical: string | undefined,
+  baseUrl: string | undefined,
+  warnings: string[],
+): string | undefined {
+  if (!canonical) return undefined;
+
+  try {
+    const resolved = baseUrl
+      ? new URL(canonical, baseUrl)
+      : new URL(canonical);
+
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
+      warnings.push("Canonical URL uses an unsupported protocol.");
+      return undefined;
+    }
+
+    if (resolved.username || resolved.password) {
+      warnings.push("Canonical URL must not contain credentials.");
+      return undefined;
     }
 
     return resolved.href;
   } catch {
-    return null;
+    warnings.push(
+      "Canonical URL could not be resolved; provide a valid absolute URL or baseUrl.",
+    );
+    return undefined;
   }
 }
 
 /**
- * Extracts the first matching attribute from an HTML tag.
- * Handles quoted and unquoted attribute values.
- */
-function getAttribute(
-  tag: string,
-  attributeName: string,
-): string | null {
-  const escapedName = attributeName.replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\$&",
-  );
-
-  const pattern = new RegExp(
-    `(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>\\x60]+))`,
-    "i",
-  );
-
-  const match = pattern.exec(tag);
-
-  if (!match) {
-    return null;
-  }
-
-  return normalizeText(match[1] ?? match[2] ?? match[3] ?? "");
-}
-
-/**
- * Returns all opening tags of a given name.
+ * Extract SEO and social metadata from an HTML document.
  *
- * Note: regex-based parsing is suitable for common metadata extraction,
- * but it is not a substitute for a standards-compliant HTML parser.
+ * Note: this is a lightweight parser, not a full HTML5 parser.
+ * For production crawling, consider a dedicated HTML parser.
  */
-function findOpeningTags(html: string, tagName: string): string[] {
-  const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(
-    `<${escapedTagName}(?=[\\s/>])[^>]*>`,
-    "gi",
-  );
-
-  return html.match(pattern) ?? [];
-}
-
-function findMetaContent(
-  html: string,
-  attributeName: "name" | "property",
-  key: string,
-): string | null {
-  for (const tag of findOpeningTags(html, "meta")) {
-    const attribute = getAttribute(tag, attributeName);
-
-    if (attribute?.toLowerCase() === key.toLowerCase()) {
-      const content = getAttribute(tag, "content");
-
-      if (content) {
-        return content;
-      }
-    }
-  }
-
-  return null;
-}
-
-function collectSocialMetadata(
-  html: string,
-  prefix: "og:" | "twitter:",
-): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  for (const tag of findOpeningTags(html, "meta")) {
-    const property =
-      getAttribute(tag, "property") ?? getAttribute(tag, "name");
-
-    if (!property?.toLowerCase().startsWith(prefix)) {
-      continue;
-    }
-
-    const content = getAttribute(tag, "content");
-
-    if (!content) {
-      continue;
-    }
-
-    const key = property.slice(prefix.length).toLowerCase();
-
-    // Avoid prototype-sensitive property names.
-    if (
-      key.length > 0 &&
-      key !== "__proto__" &&
-      key !== "constructor" &&
-      key !== "prototype" &&
-      result[key] === undefined
-    ) {
-      result[key] = content;
-    }
-  }
-
-  return result;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                            Main Extraction API                            */
-/* -------------------------------------------------------------------------- */
-
 export function extractWebsiteMetadata(
   html: string,
-  options: MetadataExtractionOptions,
+  options: MetadataExtractionOptions = {},
 ): MetadataExtractionResult {
-  const errors: string[] = [];
+  const warnings: string[] = [];
+  const maxHtmlLength =
+    options.maxHtmlLength ?? DEFAULT_MAX_HTML_LENGTH;
 
-  if (typeof html !== "string") {
-    return {
-      success: false,
-      metadata: null,
-      errors: ["HTML input must be a string."],
-    };
-  }
-
-  if (typeof options.pageUrl !== "string" || !isValidHttpUrl(options.pageUrl)) {
-    return {
-      success: false,
-      metadata: null,
-      errors: ["pageUrl must be a valid HTTP or HTTPS URL."],
-    };
-  }
-
-  const maxHtmlLength = options.maxHtmlLength ?? DEFAULT_MAX_HTML_LENGTH;
-
-  if (
-    !Number.isSafeInteger(maxHtmlLength) ||
-    maxHtmlLength <= 0
-  ) {
-    return {
-      success: false,
-      metadata: null,
-      errors: ["maxHtmlLength must be a positive safe integer."],
-    };
+  if (!Number.isSafeInteger(maxHtmlLength) || maxHtmlLength < 1) {
+    throw new RangeError("maxHtmlLength must be a positive safe integer.");
   }
 
   if (html.length > maxHtmlLength) {
-    return {
-      success: false,
-      metadata: null,
-      errors: [
-        `HTML exceeds the configured limit of ${maxHtmlLength} characters.`,
-      ],
-    };
-  }
-
-  const finalUrl = options.finalUrl ?? options.pageUrl;
-
-  if (!isValidHttpUrl(finalUrl)) {
-    return {
-      success: false,
-      metadata: null,
-      errors: ["finalUrl must be a valid HTTP or HTTPS URL."],
-    };
-  }
-
-  const baseUrl = finalUrl;
-
-  // Remove comments before looking for metadata tags.
-  const cleanHtml = html.replace(/<!--[\s\S]*?-->/g, "");
-
-  const titleMatch = /<title(?:\s[^>]*)?>([\s\S]*?)<\/title\s*>/i.exec(
-    cleanHtml,
-  );
-
-  const title = titleMatch
-    ? normalizeText(titleMatch[1] ?? "")
-    : null;
-
-  const description = findMetaContent(
-    cleanHtml,
-    "name",
-    "description",
-  );
-
-  const languageMatch = /<html\b([^>]*)>/i.exec(cleanHtml);
-  const language = languageMatch
-    ? getAttribute(languageMatch[1] ?? "", "lang")
-    : null;
-
-  const charsetMatch =
-    /<meta\b[^>]*\bcharset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/i.exec(
-      cleanHtml,
+    throw new RangeError(
+      `HTML exceeds the maximum allowed length of ${maxHtmlLength} characters.`,
     );
+  }
 
-  const charset = charsetMatch
-    ? normalizeText(
-        charsetMatch[1] ?? charsetMatch[2] ?? charsetMatch[3] ?? "",
-      )
-    : null;
+  const title =
+    findOpenGraph(html, "og:title") ??
+    findTwitterMeta(html, "title") ??
+    findTitle(html);
 
-  const viewport = findMetaContent(
-    cleanHtml,
-    "name",
-    "viewport",
+  const description =
+    findMetaByName(html, "description") ??
+    findOpenGraph(html, "og:description") ??
+    findTwitterMeta(html, "description");
+
+  const canonicalUrl = resolveCanonicalUrl(
+    findCanonicalUrl(html),
+    options.baseUrl,
+    warnings,
   );
 
-  const robots = findMetaContent(cleanHtml, "name", "robots");
-
-  let canonicalUrl: string | null = null;
-
-  for (const tag of findOpeningTags(cleanHtml, "link")) {
-    const rel = getAttribute(tag, "rel");
-
-    if (
-      rel
-        ?.toLowerCase()
-        .split(/\s+/)
-        .includes("canonical")
-    ) {
-      canonicalUrl = resolveMetadataUrl(
-        getAttribute(tag, "href"),
-        baseUrl,
-      );
-
-      if (canonicalUrl) {
-        break;
-      }
-    }
-  }
-
-  let faviconUrl: string | null = null;
-
-  for (const tag of findOpeningTags(cleanHtml, "link")) {
-    const rel = getAttribute(tag, "rel")?.toLowerCase().split(/\s+/);
-
-    if (
-      rel?.some(
-        (value) =>
-          value === "icon" ||
-          value === "shortcut" ||
-          value === "apple-touch-icon",
-      )
-    ) {
-      faviconUrl = resolveMetadataUrl(
-        getAttribute(tag, "href"),
-        baseUrl,
-      );
-
-      if (faviconUrl) {
-        break;
-      }
-    }
-  }
-
-  if (!faviconUrl) {
-    faviconUrl = resolveMetadataUrl("/favicon.ico", baseUrl);
-  }
-
-  const metadata: WebsiteMetadata = {
-    url: options.pageUrl,
-    ...(options.finalUrl ? { finalUrl: options.finalUrl } : {}),
+  const metadata = {
     title,
     description,
-    language,
-    charset,
-    viewport,
     canonicalUrl,
-    faviconUrl,
-    robots,
-    openGraph: collectSocialMetadata(cleanHtml, "og:"),
-    twitterCard: collectSocialMetadata(cleanHtml, "twitter:"),
-  };
+    language:
+      html.match(/<html\b[^>]*>/i)?.[0] &&
+      getAttribute(html.match(/<html\b[^>]*>/i)?.[0] ?? "", "lang"),
+    robots: findMetaByName(html, "robots"),
+    author: findMetaByName(html, "author"),
+    keywords: findMetaByName(html, "keywords"),
+    faviconUrl: (() => {
+      const links = html.match(/<link\b[^>]*>/gi) ?? [];
 
-  if (title === null) {
-    errors.push("The HTML document does not contain a title element.");
-  }
+      for (const link of links) {
+        const rel = getAttribute(link, "rel")?.toLowerCase().split(/\s+/);
 
-  if (!description) {
-    errors.push("The HTML document does not contain a meta description.");
-  }
+        if (rel?.some((value) => value === "icon" || value === "shortcut")) {
+          const href = getAttribute(link, "href");
+
+          if (href) {
+            try {
+              return options.baseUrl
+                ? new URL(href, options.baseUrl).href
+                : new URL(href).href;
+            } catch {
+              warnings.push("Favicon URL could not be resolved.");
+              return undefined;
+            }
+          }
+        }
+      }
+
+      return undefined;
+    })(),
+    openGraph: {
+      title: findOpenGraph(html, "og:title"),
+      description: findOpenGraph(html, "og:description"),
+      image: findOpenGraph(html, "og:image"),
+      url: findOpenGraph(html, "og:url"),
+      type: findOpenGraph(html, "og:type"),
+      siteName: findOpenGraph(html, "og:site_name"),
+    },
+    twitter: {
+      card: findTwitterMeta(html, "card"),
+      title: findTwitterMeta(html, "title"),
+      description: findTwitterMeta(html, "description"),
+      image: findTwitterMeta(html, "image"),
+      site: findTwitterMeta(html, "site"),
+    },
+  } satisfies Partial<WebsiteMetadata>;
+
+  if (!metadata.title) warnings.push("Page title was not found.");
+  if (!metadata.description) warnings.push("Meta description was not found.");
 
   return {
-    success: true,
-    metadata,
-    errors,
+    metadata: metadata as WebsiteMetadata,
+    warnings,
   };
 }
