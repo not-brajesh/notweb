@@ -58,8 +58,10 @@ function decodeHtmlEntities(value: string): string {
       if (encoded.startsWith("#x") || encoded.startsWith("#X")) {
         const codePoint = Number.parseInt(encoded.slice(2), 16);
 
-        return Number.isFinite(codePoint) && codePoint >= 0 &&
-          codePoint <= 0x10ffff
+        return Number.isFinite(codePoint) &&
+          codePoint >= 0 &&
+          codePoint <= 0x10ffff &&
+          !(codePoint >= 0xd800 && codePoint <= 0xdfff)
           ? String.fromCodePoint(codePoint)
           : entity;
       }
@@ -67,8 +69,10 @@ function decodeHtmlEntities(value: string): string {
       if (encoded.startsWith("#")) {
         const codePoint = Number.parseInt(encoded.slice(1), 10);
 
-        return Number.isFinite(codePoint) && codePoint >= 0 &&
-          codePoint <= 0x10ffff
+        return Number.isFinite(codePoint) &&
+          codePoint >= 0 &&
+          codePoint <= 0x10ffff &&
+          !(codePoint >= 0xd800 && codePoint <= 0xdfff)
           ? String.fromCodePoint(codePoint)
           : entity;
       }
@@ -119,12 +123,16 @@ function getMetaContent(
 
   for (const tag of metaTags) {
     const attributes = tag.replace(/^<meta\b/i, "").replace(/\/?>$/, "");
+
     const key =
       getAttribute(attributes, "property") ??
       getAttribute(attributes, "name") ??
       getAttribute(attributes, "itemprop");
 
-    if (key && keyNames.some((name) => key.toLowerCase() === name.toLowerCase())) {
+    if (
+      key &&
+      keyNames.some((name) => key.toLowerCase() === name.toLowerCase())
+    ) {
       const content = getAttribute(attributes, "content");
 
       if (content) {
@@ -138,6 +146,7 @@ function getMetaContent(
 
 function getTitle(html: string): string | undefined {
   const match = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(html);
+
   return cleanText(match?.[1]);
 }
 
@@ -189,10 +198,7 @@ function resolveMetadataUrl(
   try {
     const parsed = baseUrl ? new URL(value, baseUrl) : new URL(value);
 
-    if (
-      parsed.protocol !== "http:" &&
-      parsed.protocol !== "https:"
-    ) {
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return undefined;
     }
 
@@ -246,9 +252,8 @@ function extractTwitter(html: string): TwitterMetadata {
 /**
  * Extract metadata from an HTML document.
  *
- * The returned structure always contains the required WebsiteMetadata
- * fields. Missing optional HTML metadata is represented by empty strings
- * or empty objects, matching the existing package contract.
+ * Missing optional HTML metadata is represented by empty strings,
+ * matching the existing WebsiteMetadata contract.
  */
 export function extractWebsiteMetadata(
   html: string,
@@ -260,12 +265,14 @@ export function extractWebsiteMetadata(
   const twitter = extractTwitter(html);
 
   const title =
-    getMetaContent(html, ["og:title", "twitter:title"]) ??
+    getMetaContent(html, ["og:title"]) ??
+    getMetaContent(html, ["twitter:title"]) ??
     getTitle(html) ??
     "";
 
   const description =
-    getMetaContent(html, ["description", "og:description"]) ??
+    getMetaContent(html, ["description"]) ??
+    getMetaContent(html, ["og:description"]) ??
     getMetaContent(html, ["twitter:description"]) ??
     "";
 
@@ -288,6 +295,7 @@ export function extractWebsiteMetadata(
   const ogUrl = resolveMetadataUrl(openGraph.url, options.baseUrl);
 
   const metadata = {
+    // Required WebsiteMetadata fields
     url: options.baseUrl ?? "",
     title,
     description,
@@ -297,6 +305,24 @@ export function extractWebsiteMetadata(
     author: getMetaContent(html, ["author"]) ?? "",
     keywords: getMetaContent(html, ["keywords"]) ?? "",
     faviconUrl: faviconUrl ?? "",
+
+    // Required document metadata fields
+    charset:
+      getAttribute(
+        (html.match(/<meta\b[^>]*>/i)?.[0] ?? "").replace(
+          /^<meta\b/i,
+          "",
+        ),
+        "charset",
+      ) ??
+      getMetaContent(html, ["charset"]) ??
+      "UTF-8",
+
+    viewport:
+      getMetaContent(html, ["viewport"]) ??
+      "",
+
+    // Explicitly type nested metadata to match the package contract.
     openGraph: {
       title: openGraph.title ?? "",
       description: openGraph.description ?? "",
@@ -305,6 +331,7 @@ export function extractWebsiteMetadata(
       type: openGraph.type ?? "",
       siteName: openGraph.siteName ?? "",
     },
+
     twitter: {
       card: twitter.card ?? "",
       title: twitter.title ?? "",
@@ -350,10 +377,7 @@ export function getMetadataOrigin(value: string): string | undefined {
   try {
     const parsed = new URL(value);
 
-    if (
-      parsed.protocol !== "http:" &&
-      parsed.protocol !== "https:"
-    ) {
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return undefined;
     }
 
