@@ -43,7 +43,7 @@ export function parseUrl(value: string): URL | null {
 /**
  * Validates an absolute HTTP or HTTPS URL.
  */
-export function validateWebsiteUrl(value: string): UrlValidationResult {
+export function validateWebsiteUrlDetailed(value: string): UrlValidationResult {
   const trimmed = value.trim();
 
   if (trimmed.length === 0) {
