@@ -403,9 +403,8 @@ export function downloadReport(
   }, DOWNLOAD_URL_CLEANUP_DELAY_MS);
 }
 
-
 function getSafeExtension(filename: string): string {
-  const match = filename.match(/\.(json|csv)$/i);
+  const match = filename.match(/\.([a-zA-Z0-9]+)$/);
   const extension = match?.[1];
 
   if (!extension) {
