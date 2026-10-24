@@ -406,5 +406,9 @@ export function downloadReport(
 function getSafeExtension(filename: string): string {
   const match = filename.match(/\.(json|csv)$/i);
 
-  return match ? `.${match[1].toLowerCase()}` : ".json";
+
+const extension = match?.[1];
+
+return extension ? `.${extension.toLowerCase()}:` : ".json";
+
 }
