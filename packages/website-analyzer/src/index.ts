@@ -2,11 +2,10 @@
 /**
  * NOTWEB — Website Analyzer
  *
- * Core contracts and utilities for analyzing website structure,
- * metadata, SEO, accessibility, and performance.
+ * Core contracts and public API for website analysis.
  *
  * Security:
- * URL validation alone does not make a URL safe to fetch.
+ * URL validation does not make a URL safe to fetch.
  * Network access must use a dedicated SSRF-safe fetching layer.
  */
 
@@ -17,7 +16,7 @@ import {
 } from "@notweb/shared";
 
 /* -------------------------------------------------------------------------- */
-/*                                  Types                                     */
+/* Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export type AnalysisSeverity =
@@ -43,49 +42,20 @@ export type AnalysisStatus =
   | "failed";
 
 export interface WebsiteMetadata {
-  /** Original URL supplied for analysis. */
   url: string;
-
-  /** Final URL after redirects, when available. */
   finalUrl?: string;
-
-  /** Document title. */
   title: string | null;
-
-  /** Meta description. */
   description: string | null;
-
-  /** HTML document language. */
   language: string | null;
-
-  /** Document character encoding. */
   charset: string | null;
-
-  /** Viewport configuration. */
   viewport: string | null;
-
-  /** Canonical page URL. */
   canonicalUrl: string | null;
-
-  /** Resolved favicon URL. */
   faviconUrl: string | null;
-
-  /** Robots directives. */
   robots: string | null;
-
-  /** Document author. */
   author?: string | null;
-
-  /** Search keywords. */
   keywords?: string | null;
-
-  /** Open Graph metadata. */
   openGraph: Record<string, string>;
-
-  /** Twitter card metadata represented as key-value pairs. */
   twitterCard: Record<string, string>;
-
-  /** Structured Twitter metadata retained by the extractor. */
   twitter?: Record<string, string>;
 }
 
@@ -106,6 +76,12 @@ export interface CategoryScore {
   issueCount: number;
 }
 
+export interface AnalysisError {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
 export interface WebsiteAnalysisResult {
   id: string;
   requestedUrl: string;
@@ -118,12 +94,6 @@ export interface WebsiteAnalysisResult {
   issues: AnalysisIssue[];
   scores: CategoryScore[];
   error: AnalysisError | null;
-}
-
-export interface AnalysisError {
-  code: string;
-  message: string;
-  retryable: boolean;
 }
 
 export interface AnalyzeWebsiteOptions {
@@ -140,7 +110,7 @@ export interface WebsiteUrlValidation {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                Constants                                   */
+/* Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export const ANALYZER_VERSION = "0.1.0";
@@ -163,15 +133,14 @@ export const ANALYSIS_CATEGORIES: readonly AnalysisCategory[] = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/*                             URL Validation                                 */
+/* URL Validation                                                             */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Performs basic syntactic validation and normalization.
+ * Performs syntactic URL validation and normalization.
  *
- * This function does NOT fetch the URL and does NOT protect against SSRF.
- * Before fetching, validate DNS results and every redirect destination,
- * block private/loopback/link-local IP addresses, and restrict protocols.
+ * This function does not fetch the URL and does not prevent SSRF.
+ * Fetching requires separate network-level security checks.
  */
 export function validateAnalysisUrl(
   value: string,
@@ -244,13 +213,9 @@ export function validateAnalysisUrl(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Score Utilities                                */
+/* Score Utilities                                                            */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Returns a score from 0 to 100.
- * A null score means that the category has not been evaluated.
- */
 export function normalizeScore(
   value: number | null,
 ): number | null {
@@ -262,9 +227,7 @@ export function normalizeScore(
 }
 
 /**
- * Calculates a simple issue-based score.
- *
- * This is a heuristic, not a standards-compliance guarantee.
+ * Calculates a heuristic score from issues.
  * Pass only issues belonging to the category being scored.
  */
 export function calculateCategoryScore(
@@ -287,13 +250,9 @@ export function calculateCategoryScore(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Result Utilities                               */
+/* Result Utilities                                                           */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Creates an empty metadata record for a URL.
- * Actual metadata must be extracted by a separate HTML parser.
- */
 export function createEmptyMetadata(
   url: string,
 ): WebsiteMetadata {
@@ -315,21 +274,16 @@ export function createEmptyMetadata(
   };
 }
 
-/**
- * Creates a predictable initial analysis result.
- */
 export function createAnalysisResult(
   id: string,
   url: string,
 ): WebsiteAnalysisResult {
-  const now = new Date().toISOString();
-
   return {
     id,
     requestedUrl: url,
     analyzedUrl: url,
     status: "queued",
-    startedAt: now,
+    startedAt: new Date().toISOString(),
     completedAt: null,
     durationMs: null,
     metadata: null,
@@ -343,9 +297,6 @@ export function createAnalysisResult(
   };
 }
 
-/**
- * Groups issues by category and calculates category scores.
- */
 export function summarizeIssues(
   issues: readonly AnalysisIssue[],
 ): CategoryScore[] {
@@ -363,7 +314,7 @@ export function summarizeIssues(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                             Public API                                     */
+/* Core Public API                                                            */
 /* -------------------------------------------------------------------------- */
 
 export const websiteAnalyzer = Object.freeze({
@@ -374,6 +325,11 @@ export const websiteAnalyzer = Object.freeze({
   calculateCategoryScore,
   summarizeIssues,
 });
+
+/* -------------------------------------------------------------------------- */
+/* Security Analysis                                                          */
+/* -------------------------------------------------------------------------- */
+
 export {
   analyzeSecurity,
   getSecurityIssues,
@@ -383,6 +339,10 @@ export type {
   SecurityAnalysisInput,
   SecurityAnalysisResult,
 } from "./security.js";
+
+/* -------------------------------------------------------------------------- */
+/* Website Analysis Pipeline                                                  */
+/* -------------------------------------------------------------------------- */
 
 export {
   analyzeWebsite,
@@ -394,6 +354,10 @@ export type {
   RunWebsiteAnalysisOptions,
   WebsiteAnalysisPipelineResult,
 } from "./analyzer.js";
+
+/* -------------------------------------------------------------------------- */
+/* Reports                                                                    */
+/* -------------------------------------------------------------------------- */
 
 export {
   analysisReport,
@@ -413,3 +377,61 @@ export type {
   AnalysisReportSummary,
   ReportOptions,
 } from "./report.js";
+
+/* -------------------------------------------------------------------------- */
+/* Report Exports                                                             */
+/* -------------------------------------------------------------------------- */
+
+export {
+  downloadReport,
+  exportReport,
+  exportReportAsCsv,
+  exportReportAsJson,
+  exportScoresAsCsv,
+} from "./export.js";
+
+export type {
+  ReportExport,
+  ReportExportFormat,
+} from "./export.js";
+
+/* -------------------------------------------------------------------------- */
+/* Metadata Analysis                                                          */
+/* -------------------------------------------------------------------------- */
+
+export {
+  analyzeMetadata,
+  getMetadataIssues,
+} from "./metadata-analysis.js";
+
+export type {
+  MetadataAnalysisOptions,
+  MetadataAnalysisResult,
+} from "./metadata-analysis.js";
+
+/* -------------------------------------------------------------------------- */
+/* SEO Analysis                                                               */
+/* -------------------------------------------------------------------------- */
+
+export {
+  analyzeSeo,
+  getSeoIssues,
+} from "./seo.js";
+
+/* -------------------------------------------------------------------------- */
+/* Accessibility Analysis                                                     */
+/* -------------------------------------------------------------------------- */
+
+export {
+  analyzeAccessibility,
+  getAccessibilityIssues,
+} from "./accessibility.js";
+
+/* -------------------------------------------------------------------------- */
+/* Performance Analysis                                                       */
+/* -------------------------------------------------------------------------- */
+
+export {
+  analyzePerformance,
+  getPerformanceIssues,
+} from "./performance.js";
