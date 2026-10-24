@@ -2,11 +2,25 @@
 /**
  * NOTWEB — Report Export Utilities
  *
- * Exports analysis reports as JSON and CSV.
+ * Production-oriented utilities for exporting website analysis reports
+ * as JSON and CSV, with browser download support.
+ *
+ * Security:
+ * - CSV formula injection mitigation
+ * - Sanitized filenames
+ * - JSON serialization error handling
+ * - Browser environment validation
+ * - Object URL cleanup
+ *
+ * This module does not fetch URLs or execute website code.
  */
 
 import type { AnalysisIssue } from "./index.js";
 import type { AnalysisReport } from "./report.js";
+
+/* -------------------------------------------------------------------------- */
+/*                                    Types                                   */
+/* -------------------------------------------------------------------------- */
 
 export type ReportExportFormat = "json" | "csv";
 
@@ -16,15 +30,78 @@ export interface ReportExport {
   content: string;
 }
 
+export interface ExportOptions {
+  /** Optional filename prefix, without an extension. */
+  filenamePrefix?: string;
+}
+
+export interface ExportValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  Constants                                 */
+/* -------------------------------------------------------------------------- */
+
+const MAX_FILENAME_LENGTH = 100;
+const DOWNLOAD_URL_CLEANUP_DELAY_MS = 1_000;
+
+const ISSUE_CSV_HEADERS = [
+  "Issue ID",
+  "Category",
+  "Severity",
+  "Title",
+  "Description",
+  "Recommendation",
+  "Element",
+  "Documentation URL",
+] as const;
+
+const SCORE_CSV_HEADERS = [
+  "Category",
+  "Score",
+  "Issue Count",
+] as const;
+
+/* -------------------------------------------------------------------------- */
+/*                               CSV Utilities                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Neutralizes spreadsheet formula prefixes before CSV escaping.
+ *
+ * Spreadsheet applications may interpret cells beginning with formula
+ * characters as executable formulas. Prefixing dangerous values with an
+ * apostrophe reduces this risk, although spreadsheet behavior varies.
+ */
+function neutralizeCsvFormula(value: string): string {
+  const normalized = value.replace(/^[\u0000-\u0020]+/, "");
+
+  if (/^[=+\-@\t\r]/.test(normalized)) {
+    return `'${value}`;
+  }
+
+  return value;
+}
+
+/**
+ * Escapes a value as a CSV cell.
+ */
 function escapeCsvCell(value: unknown): string {
-  const text =
+  let text =
     value === null || value === undefined
       ? ""
       : String(value);
 
+  text = neutralizeCsvFormula(text);
+
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Creates CSV content with CRLF line endings and a UTF-8 BOM.
+ */
 function createCsv(
   headers: readonly string[],
   rows: readonly (readonly unknown[])[],
@@ -34,10 +111,12 @@ function createCsv(
     ...rows.map((row) => row.map(escapeCsvCell).join(",")),
   ];
 
-  // UTF-8 BOM improves compatibility with spreadsheet software.
   return `\uFEFF${lines.join("\r\n")}`;
 }
 
+/**
+ * Converts analysis issues into CSV rows.
+ */
 function issueRows(
   issues: readonly AnalysisIssue[],
 ): unknown[][] {
@@ -53,73 +132,163 @@ function issueRows(
   ]);
 }
 
+/* -------------------------------------------------------------------------- */
+/*                             Filename Utilities                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Produces a filesystem-safe filename component.
+ */
 function safeFilenamePart(value: string): string {
-  return value
+  const sanitized = value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/^https?:\/\//i, "")
+    .replace(/[?#].*$/, "")
     .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "website";
+    .slice(0, MAX_FILENAME_LENGTH)
+    .replace(/-+$/g, "");
+
+  return sanitized || "website";
 }
 
 /**
- * Export a report as formatted JSON.
+ * Creates a filename from a report URL and suffix.
  */
-export function exportReportAsJson(
+function createReportFilename(
   report: AnalysisReport,
-): ReportExport {
-  const filename = `${safeFilenamePart(
-    report.website.analyzedUrl,
-  )}-report.json`;
+  suffix: string,
+  options?: ExportOptions,
+): string {
+  const prefix = options?.filenamePrefix
+    ? safeFilenamePart(options.filenamePrefix)
+    : safeFilenamePart(report.website.analyzedUrl);
+
+  return `${prefix}-${suffix}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             Validation Utilities                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Performs basic validation before exporting a report.
+ */
+export function validateReportForExport(
+  report: AnalysisReport,
+): ExportValidationResult {
+  const errors: string[] = [];
+
+  if (!report || typeof report !== "object") {
+    return {
+      valid: false,
+      errors: ["A valid analysis report is required."],
+    };
+  }
+
+  if (
+    typeof report.website?.analyzedUrl !== "string" ||
+    report.website.analyzedUrl.trim().length === 0
+  ) {
+    errors.push("The report must contain an analyzed website URL.");
+  }
+
+  if (!Array.isArray(report.issues)) {
+    errors.push("The report issues must be an array.");
+  }
+
+  if (!Array.isArray(report.categories)) {
+    errors.push("The report categories must be an array.");
+  }
 
   return {
-    filename,
-    mimeType: "application/json;charset=utf-8",
-    content: JSON.stringify(report, null, 2),
+    valid: errors.length === 0,
+    errors,
   };
 }
 
-/**
- * Export report issues as CSV.
- */
-export function exportReportAsCsv(
-  report: AnalysisReport,
-): ReportExport {
-  const headers = [
-    "Issue ID",
-    "Category",
-    "Severity",
-    "Title",
-    "Description",
-    "Recommendation",
-    "Element",
-    "Documentation URL",
-  ];
+function assertValidReport(report: AnalysisReport): void {
+  const validation = validateReportForExport(report);
 
-  const content = createCsv(
-    headers,
-    issueRows(report.issues),
-  );
+  if (!validation.valid) {
+    throw new Error(
+      `Cannot export report: ${validation.errors.join(" ")}`,
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                JSON Export                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Exports a report as formatted JSON.
+ */
+export function exportReportAsJson(
+  report: AnalysisReport,
+  options?: ExportOptions,
+): ReportExport {
+  assertValidReport(report);
+
+  let content: string | undefined;
+
+  try {
+    content = JSON.stringify(report, null, 2);
+  } catch {
+    throw new Error("Failed to serialize the analysis report as JSON.");
+  }
+
+  if (content === undefined) {
+    throw new Error("The analysis report could not be serialized.");
+  }
 
   return {
-    filename: `${safeFilenamePart(
-      report.website.analyzedUrl,
-    )}-issues.csv`,
-    mimeType: "text/csv;charset=utf-8",
+    filename: createReportFilename(
+      report,
+      "report.json",
+      options,
+    ),
+    mimeType: "application/json;charset=utf-8",
     content,
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 CSV Export                                 */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Export category scores as CSV.
+ * Exports report issues as CSV.
+ */
+export function exportReportAsCsv(
+  report: AnalysisReport,
+  options?: ExportOptions,
+): ReportExport {
+  assertValidReport(report);
+
+  return {
+    filename: createReportFilename(
+      report,
+      "issues.csv",
+      options,
+    ),
+    mimeType: "text/csv;charset=utf-8",
+    content: createCsv(
+      ISSUE_CSV_HEADERS,
+      issueRows(report.issues),
+    ),
+  };
+}
+
+/**
+ * Exports category scores as CSV.
  */
 export function exportScoresAsCsv(
   report: AnalysisReport,
+  options?: ExportOptions,
 ): ReportExport {
-  const headers = [
-    "Category",
-    "Score",
-    "Issue Count",
-  ];
+  assertValidReport(report);
 
   const rows = report.categories.map((category) => [
     category.category,
@@ -128,30 +297,38 @@ export function exportScoresAsCsv(
   ]);
 
   return {
-    filename: `${safeFilenamePart(
-      report.website.analyzedUrl,
-    )}-scores.csv`,
+    filename: createReportFilename(
+      report,
+      "scores.csv",
+      options,
+    ),
     mimeType: "text/csv;charset=utf-8",
-    content: createCsv(headers, rows),
+    content: createCsv(SCORE_CSV_HEADERS, rows),
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/*                               Export Selector                              */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Select an export format.
+ * Exports a report in the requested format.
  */
 export function exportReport(
   report: AnalysisReport,
   format: ReportExportFormat,
+  options?: ExportOptions,
 ): ReportExport {
   switch (format) {
     case "json":
-      return exportReportAsJson(report);
+      return exportReportAsJson(report, options);
 
     case "csv":
-      return exportReportAsCsv(report);
+      return exportReportAsCsv(report, options);
 
     default: {
       const unsupported: never = format;
+
       throw new Error(
         `Unsupported report format: ${String(unsupported)}`,
       );
@@ -159,10 +336,14 @@ export function exportReport(
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                              Browser Download                             */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Trigger a browser download.
+ * Triggers a browser download.
  *
- * Call this function only in a browser environment.
+ * Call only in a browser environment after a user-initiated action.
  */
 export function downloadReport(
   reportExport: ReportExport,
@@ -171,12 +352,27 @@ export function downloadReport(
     typeof window === "undefined" ||
     typeof document === "undefined" ||
     typeof Blob === "undefined" ||
-    typeof URL.createObjectURL !== "function"
+    typeof URL === "undefined" ||
+    typeof URL.createObjectURL !== "function" ||
+    typeof URL.revokeObjectURL !== "function"
   ) {
     throw new Error(
-      "Report downloads are available only in a browser environment.",
+      "Report downloads are available only in a supported browser environment.",
     );
   }
+
+  if (
+    !reportExport ||
+    typeof reportExport.content !== "string" ||
+    typeof reportExport.filename !== "string" ||
+    typeof reportExport.mimeType !== "string"
+  ) {
+    throw new Error("A valid report export is required for download.");
+  }
+
+  const safeFilename =
+    safeFilenamePart(reportExport.filename.replace(/\.[^.]+$/, "")) +
+    getSafeExtension(reportExport.filename);
 
   const blob = new Blob(
     [reportExport.content],
@@ -187,19 +383,28 @@ export function downloadReport(
   const anchor = document.createElement("a");
 
   anchor.href = objectUrl;
-  anchor.download = reportExport.filename;
+  anchor.download = safeFilename;
   anchor.style.display = "none";
-
-  document.body.appendChild(anchor);
+  anchor.rel = "noopener";
 
   try {
+    document.body.appendChild(anchor);
     anchor.click();
+  } catch {
+    URL.revokeObjectURL(objectUrl);
+
+    throw new Error("The browser could not start the report download.");
   } finally {
     anchor.remove();
-
-    // Delay revocation to allow the browser to start the download.
-    window.setTimeout(() => {
-      URL.revokeObjectURL(objectUrl);
-    }, 1000);
   }
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, DOWNLOAD_URL_CLEANUP_DELAY_MS);
+}
+
+function getSafeExtension(filename: string): string {
+  const match = filename.match(/\.(json|csv)$/i);
+
+  return match ? `.${match[1].toLowerCase()}` : ".json";
 }
