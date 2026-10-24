@@ -403,12 +403,15 @@ export function downloadReport(
   }, DOWNLOAD_URL_CLEANUP_DELAY_MS);
 }
 
+
 function getSafeExtension(filename: string): string {
   const match = filename.match(/\.(json|csv)$/i);
+  const extension = match?.[1];
 
+  if (!extension) {
+    return ".json";
+  }
 
-const extension = match?.[1];
-
-return extension ? `.${extension.toLowerCase()}:` : ".json";
-
+  return `.${extension.toLowerCase()}`;
 }
+
