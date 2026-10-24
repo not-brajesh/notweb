@@ -29,7 +29,7 @@ describe("Best Practices Analysis", () => {
 
     expect(result.score).toBe(100);
     expect(result.issues).toHaveLength(0);
-    expect(result.checksPerformed).toBe(10);
+    expect(result.checksPerformed).toBe(11);
   });
 
   it("detects a missing HTML doctype", () => {
