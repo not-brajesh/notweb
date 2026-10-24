@@ -1,8 +1,17 @@
 
+/**
+ * NOTWEB — Website Analysis Pipeline
+ *
+ * Combines metadata extraction with SEO, accessibility,
+ * performance, and security analysis.
+ *
+ * This module analyzes supplied HTML only.
+ * It does not fetch URLs or execute website JavaScript.
+ */
+
 import type {
   AnalysisCategory,
   AnalysisIssue,
-  AnalysisStatus,
   CategoryScore,
   WebsiteAnalysisResult,
   WebsiteMetadata,
@@ -10,38 +19,26 @@ import type {
 
 import {
   ANALYSIS_CATEGORIES,
-  DEFAULT_ANALYSIS_OPTIONS,
   calculateCategoryScore,
   createAnalysisResult,
   validateAnalysisUrl,
 } from "./index.js";
 
-import {
-  extractWebsiteMetadata,
-} from "./metadata.js";
+import { extractWebsiteMetadata } from "./metadata.js";
+import { analyzeSeo } from "./seo.js";
+import { analyzeAccessibility } from "./accessibility.js";
+import { analyzePerformance } from "./performance.js";
+import { analyzeSecurity } from "./security.js";
 
-import {
-  analyzeSeo,
-} from "./seo.js";
-
-import {
-  analyzeAccessibility,
-} from "./accessibility.js";
-
-import {
-  analyzePerformance,
-} from "./performance.js";
-
-import {
-  analyzeSecurity,
-} from "./security.js";
+/* -------------------------------------------------------------------------- */
+/*                                    Types                                   */
+/* -------------------------------------------------------------------------- */
 
 export interface RunWebsiteAnalysisOptions {
   url: string;
   html: string;
   statusCode?: number;
   finalUrl?: string;
-  timeoutMs?: number;
   includeCategories?: AnalysisCategory[];
 }
 
@@ -50,6 +47,10 @@ export interface WebsiteAnalysisPipelineResult {
   result: WebsiteAnalysisResult | null;
   error: string | null;
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                  Utilities                                 */
+/* -------------------------------------------------------------------------- */
 
 function createFailure(
   message: string,
@@ -61,16 +62,35 @@ function createFailure(
   };
 }
 
+function getSelectedCategories(
+  requested?: AnalysisCategory[],
+): AnalysisCategory[] {
+  if (!requested || requested.length === 0) {
+    return [...ANALYSIS_CATEGORIES];
+  }
+
+  const allowed = new Set<AnalysisCategory>(ANALYSIS_CATEGORIES);
+
+  return [...new Set(requested)].filter((category) =>
+    allowed.has(category),
+  );
+}
+
 function createMetadata(
   url: string,
+  finalUrl: string,
   html: string,
 ): WebsiteMetadata {
-  const extracted = extractWebsiteMetadata(html, {
-    baseUrl: url,
+  const extraction = extractWebsiteMetadata(html, {
+    baseUrl: finalUrl,
   });
 
+  const extracted = extraction.metadata;
+
   return {
+    ...extracted,
     url,
+    finalUrl,
     title: extracted.title || null,
     description: extracted.description || null,
     language: extracted.language || null,
@@ -79,13 +99,11 @@ function createMetadata(
     canonicalUrl: extracted.canonicalUrl || null,
     faviconUrl: extracted.faviconUrl || null,
     robots: extracted.robots || null,
-    openGraph: extracted.openGraph ?? {},
-    twitterCard: extracted.twitterCard ?? {},
   };
 }
 
 function calculateScores(
-  issues: AnalysisIssue[],
+  issues: readonly AnalysisIssue[],
   categories: readonly AnalysisCategory[],
 ): CategoryScore[] {
   return categories.map((category) => {
@@ -101,27 +119,17 @@ function calculateScores(
   });
 }
 
-function getSelectedCategories(
-  requested?: AnalysisCategory[],
-): AnalysisCategory[] {
-  if (!requested || requested.length === 0) {
-    return [...ANALYSIS_CATEGORIES];
-  }
-
-  const validCategories = new Set<AnalysisCategory>(
-    ANALYSIS_CATEGORIES,
-  );
-
-  return [...new Set(requested)].filter((category) =>
-    validCategories.has(category),
-  );
-}
+/* -------------------------------------------------------------------------- */
+/*                              Main Analysis                                 */
+/* -------------------------------------------------------------------------- */
 
 /**
- * Runs the available website analysis modules against supplied HTML.
+ * Analyzes HTML that has already been obtained by the caller.
  *
- * This function analyzes HTML that has already been obtained.
- * It does not fetch websites or execute JavaScript.
+ * Important:
+ * - This function does not fetch the supplied URL.
+ * - It does not execute JavaScript.
+ * - URL validation is syntactic, not SSRF protection.
  */
 export function runWebsiteAnalysis(
   options: RunWebsiteAnalysisOptions,
@@ -134,84 +142,90 @@ export function runWebsiteAnalysis(
     );
   }
 
-  if (typeof options.html !== "string" || !options.html.trim()) {
+  if (
+    typeof options.html !== "string" ||
+    options.html.trim().length === 0
+  ) {
     return createFailure(
       "HTML content is required to analyze a website.",
     );
   }
 
-  const startedAt = new Date().toISOString();
-  const normalizedUrl = validation.normalizedUrl;
-  const analyzedUrl = options.finalUrl ?? normalizedUrl;
-
+  const requestedUrl = validation.normalizedUrl;
+  const analyzedUrl = options.finalUrl ?? requestedUrl;
   const selectedCategories = getSelectedCategories(
     options.includeCategories,
   );
 
-  const issues: AnalysisIssue[] = [];
-  let metadata: WebsiteMetadata | null = null;
+  let result: WebsiteAnalysisResult;
 
   try {
-    metadata = createMetadata(normalizedUrl, options.html);
+    const startedAt = new Date().toISOString();
+
+    const metadata = createMetadata(
+      requestedUrl,
+      analyzedUrl,
+      options.html,
+    );
+
+    const issues: AnalysisIssue[] = [];
 
     if (selectedCategories.includes("seo")) {
-      issues.push(
-        ...analyzeSeo({
-          html: options.html,
-          metadata,
-          statusCode: options.statusCode,
-        }).issues,
-      );
+      const seoResult = analyzeSeo({
+        html: options.html,
+        metadata,
+        ...(options.statusCode !== undefined
+          ? { statusCode: options.statusCode }
+          : {}),
+      });
+
+      issues.push(...seoResult.issues);
     }
 
     if (selectedCategories.includes("accessibility")) {
-      issues.push(
-        ...analyzeAccessibility({
-          html: options.html,
-        }).issues,
-      );
+      const accessibilityResult = analyzeAccessibility({
+        html: options.html,
+      });
+
+      issues.push(...accessibilityResult.issues);
     }
 
     if (selectedCategories.includes("performance")) {
-      issues.push(
-        ...analyzePerformance({
-          html: options.html,
-        }).issues,
-      );
+      const performanceResult = analyzePerformance({
+        html: options.html,
+      });
+
+      issues.push(...performanceResult.issues);
     }
 
     if (selectedCategories.includes("security")) {
-      issues.push(
-        ...analyzeSecurity({
-          html: options.html,
-          pageUrl: analyzedUrl,
-        }).issues,
-      );
+      const securityResult = analyzeSecurity({
+        html: options.html,
+        pageUrl: analyzedUrl,
+      });
+
+      issues.push(...securityResult.issues);
     }
 
-    const scores = calculateScores(
-      issues,
-      selectedCategories,
+    const completedAt = new Date().toISOString();
+
+    result = createAnalysisResult(
+      crypto.randomUUID(),
+      requestedUrl,
     );
 
-    const completedAt = new Date().toISOString();
-    const durationMs = Math.max(
+    result.analyzedUrl = analyzedUrl;
+    result.status = "completed";
+    result.startedAt = startedAt;
+    result.completedAt = completedAt;
+    result.durationMs = Math.max(
       0,
       Date.parse(completedAt) - Date.parse(startedAt),
     );
-
-    const result = createAnalysisResult({
-      requestedUrl: normalizedUrl,
-      analyzedUrl,
-      status: "completed" satisfies AnalysisStatus,
-      startedAt,
-      completedAt,
-      durationMs,
-      metadata,
-      issues,
-      scores,
-      error: null,
-    });
+    result.metadata = metadata;
+    result.issues = issues;
+    result.scores = calculateScores(issues, selectedCategories);
+    result.error = null;
 
     return {
       success: true,
@@ -229,14 +243,15 @@ export function runWebsiteAnalysis(
 }
 
 /**
- * Returns the analysis result or throws if analysis fails.
+ * Convenience function that returns the result directly.
+ * Throws an Error if analysis cannot be completed.
  */
 export function analyzeWebsite(
   options: RunWebsiteAnalysisOptions,
 ): WebsiteAnalysisResult {
   const outcome = runWebsiteAnalysis(options);
 
-  if (!outcome.success || !outcome.result) {
+  if (!outcome.success || outcome.result === null) {
     throw new Error(
       outcome.error ?? "Website analysis failed.",
     );
@@ -245,9 +260,10 @@ export function analyzeWebsite(
   return outcome.result;
 }
 
-/**
- * Exposes the pipeline through a small public API.
- */
+/* -------------------------------------------------------------------------- */
+/*                                  Public API                                */
+/* -------------------------------------------------------------------------- */
+
 export const websiteAnalysisPipeline = Object.freeze({
   run: runWebsiteAnalysis,
   analyze: analyzeWebsite,
