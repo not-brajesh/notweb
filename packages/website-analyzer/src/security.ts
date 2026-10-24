@@ -297,3 +297,12 @@ export function getSecurityIssues(
 ): AnalysisIssue[] {
   return analyzeSecurity(input).issues;
 }
+export {
+  analyzeSecurity,
+  getSecurityIssues,
+} from "./security.js";
+
+export type {
+  SecurityAnalysisInput,
+  SecurityAnalysisResult,
+} from "./security.js";
