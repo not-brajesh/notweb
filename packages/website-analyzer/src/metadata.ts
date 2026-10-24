@@ -404,14 +404,22 @@ openGraph: {
 },
 
 
-    twitter: {
-      card: twitter.card ?? "",
-      title: twitter.title ?? "",
-      description: twitter.description ?? "",
-      image: resolvedTwitterImage ?? "",
-      site: twitter.site ?? "",
-      creator: twitter.creator ?? "",
-    },
+
+twitter: {
+  ...(twitter.card !== undefined ? { card: twitter.card } : {}),
+  ...(twitter.title !== undefined ? { title: twitter.title } : {}),
+  ...(twitter.description !== undefined
+    ? { description: twitter.description }
+    : {}),
+  ...(resolvedTwitterImage !== undefined
+    ? { image: resolvedTwitterImage }
+    : {}),
+  ...(twitter.site !== undefined ? { site: twitter.site } : {}),
+  ...(twitter.creator !== undefined
+    ? { creator: twitter.creator }
+    : {}),
+},
+
   } satisfies WebsiteMetadata;
 
   if (!title) {
