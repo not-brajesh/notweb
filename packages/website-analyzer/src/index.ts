@@ -435,3 +435,15 @@ export {
   analyzePerformance,
   getPerformanceIssues,
 } from "./performance.js";
+
+
+export {
+  analyzeResponsiveDesign,
+  getResponsiveDesignIssues,
+} from "./responsive-analysis.js";
+
+export type {
+  ResponsiveAnalysisInput,
+  ResponsiveAnalysisMetrics,
+  ResponsiveAnalysisResult,
+} from "./responsive-analysis.js";
