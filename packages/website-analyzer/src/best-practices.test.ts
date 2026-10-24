@@ -224,6 +224,6 @@ describe("Best Practices Analysis", () => {
     expect(issueIds).toContain("best-practices-missing-html-element");
     expect(issueIds).toContain("best-practices-missing-head");
     expect(issueIds).toContain("best-practices-missing-body");
-    expect(result.checksPerformed).toBe(10);
+    expect(result.checksPerformed).toBe(11);
   });
 });
