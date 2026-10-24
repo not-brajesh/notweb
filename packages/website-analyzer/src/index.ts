@@ -447,3 +447,13 @@ export type {
   ResponsiveAnalysisMetrics,
   ResponsiveAnalysisResult,
 } from "./responsive-analysis.js";
+
+export {
+  analyzeBestPractices,
+  getBestPracticesIssues,
+} from "./best-practices.js";
+
+export type {
+  BestPracticesAnalysisInput,
+  BestPracticesAnalysisResult,
+} from "./best-practices.js";
