@@ -383,3 +383,14 @@ export type {
   SecurityAnalysisInput,
   SecurityAnalysisResult,
 } from "./security.js";
+
+export {
+  analyzeWebsite,
+  runWebsiteAnalysis,
+  websiteAnalysisPipeline,
+} from "./analyzer.js";
+
+export type {
+  RunWebsiteAnalysisOptions,
+  WebsiteAnalysisPipelineResult,
+} from "./analyzer.js";
