@@ -374,3 +374,12 @@ export const websiteAnalyzer = Object.freeze({
   calculateCategoryScore,
   summarizeIssues,
 });
+export {
+  analyzeSecurity,
+  getSecurityIssues,
+} from "./security.js";
+
+export type {
+  SecurityAnalysisInput,
+  SecurityAnalysisResult,
+} from "./security.js";
