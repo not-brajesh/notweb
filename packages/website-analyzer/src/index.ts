@@ -394,3 +394,22 @@ export type {
   RunWebsiteAnalysisOptions,
   WebsiteAnalysisPipelineResult,
 } from "./analyzer.js";
+
+export {
+  analysisReport,
+  createAnalysisReport,
+  createPriorityReport,
+  exportReportJson,
+  formatReportSummary,
+  getPriorityIssues,
+  groupIssuesBySeverity,
+  isValidAnalysisReport,
+  sortReportIssues,
+} from "./report.js";
+
+export type {
+  AnalysisReport,
+  AnalysisReportCategory,
+  AnalysisReportSummary,
+  ReportOptions,
+} from "./report.js";
