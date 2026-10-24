@@ -381,14 +381,28 @@ export function extractWebsiteMetadata(
 
     twitterCard,
 
-    openGraph: {
-      title: openGraph.title ?? "",
-      description: openGraph.description ?? "",
-      image: resolvedImage ?? "",
-      url: resolvedOpenGraphUrl ?? "",
-      type: openGraph.type ?? "",
-      siteName: openGraph.siteName ?? "",
-    },
+
+openGraph: {
+  ...(openGraph.title !== undefined
+    ? { title: openGraph.title }
+    : {}),
+  ...(openGraph.description !== undefined
+    ? { description: openGraph.description }
+    : {}),
+  ...(resolvedImage !== undefined
+    ? { image: resolvedImage }
+    : {}),
+  ...(resolvedOpenGraphUrl !== undefined
+    ? { url: resolvedOpenGraphUrl }
+    : {}),
+  ...(openGraph.type !== undefined
+    ? { type: openGraph.type }
+    : {}),
+  ...(openGraph.siteName !== undefined
+    ? { siteName: openGraph.siteName }
+    : {}),
+},
+
 
     twitter: {
       card: twitter.card ?? "",
