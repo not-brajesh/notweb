@@ -257,6 +257,7 @@ function resolveMetadataUrl(
   }
 }
 
+
 function extractOpenGraph(html: string): OpenGraphMetadata {
   const title = getMetaContent(html, ["og:title"]);
   const description = getMetaContent(html, ["og:description"]);
@@ -274,6 +275,7 @@ function extractOpenGraph(html: string): OpenGraphMetadata {
     ...(siteName !== undefined ? { siteName } : {}),
   };
 }
+
 
 function extractTwitter(html: string): TwitterMetadata {
   const card = getMetaContent(html, ["twitter:card"]);
