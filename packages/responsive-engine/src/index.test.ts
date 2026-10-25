@@ -43,6 +43,11 @@ describe("Responsive Engine", () => {
   });
 
   it("should return 100 for an empty issue list", () => {
-    expect(calculateResponsiveScore([]).score).toBe(100);
-  });
+  const result = calculateResponsiveScore([]);
+
+  expect(result).toEqual(
+    expect.objectContaining({
+      score: 100,
+    }),
+  );
 });
