@@ -31,9 +31,11 @@ export function validateProjectName(value: unknown): ValidationResult {
     errors.push("Project name cannot exceed 80 characters.");
   }
 
+  /* eslint-disable no-control-regex */
   if (/[\u0000-\u001F\u007F]/.test(name)) {
     errors.push("Project name cannot contain control characters.");
   }
+  /* eslint-enable no-control-regex */
 
   return {
     valid: errors.length === 0,
