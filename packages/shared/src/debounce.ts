@@ -1,4 +1,3 @@
-
 /**
  * NOTWEB Debounce Utilities
  *
@@ -90,6 +89,7 @@ export function debounce<TArguments extends unknown[], TResult>(
       options.leading === true && !pending;
 
     latestArgs = args;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     latestThis = this;
     pending = true;
 
