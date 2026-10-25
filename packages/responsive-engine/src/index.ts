@@ -174,13 +174,57 @@ function extractTags(html: string, tagName: string): string[] {
 function createIssue(
   id: string,
   category: ResponsiveIssueCategory,
-  severity: ResponsiveSeverity,
-  title: string,
-  description: string,
-  recommendation: string,
-  element?: string,
+  severityOrTitle: ResponsiveSeverity | string,
+  titleOrDescription: string,
+  descriptionOrRecommendation: string,
+  recommendationOrElement?: string,
+  elementOrDocumentationUrl?: string,
   documentationUrl?: string,
 ): ResponsiveIssue {
+  const severities: readonly ResponsiveSeverity[] = [
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "info",
+  ];
+
+  let severity: ResponsiveSeverity;
+  let title: string;
+  let description: string;
+  let recommendation: string;
+  let element: string | undefined;
+  let finalDocumentationUrl: string | undefined;
+
+  if (severities.includes(severityOrTitle as ResponsiveSeverity)) {
+    // Standard format:
+    // id, category, severity, title, description, recommendation, element?, documentationUrl?
+    severity = severityOrTitle as ResponsiveSeverity;
+    title = titleOrDescription;
+    description = descriptionOrRecommendation;
+    recommendation = recommendationOrElement ?? "";
+    element = elementOrDocumentationUrl;
+    finalDocumentationUrl = documentationUrl;
+  } else {
+    // Legacy format:
+    // id, category, title, description, recommendation, element?, documentationUrl?
+    title = severityOrTitle;
+    description = titleOrDescription;
+    recommendation = descriptionOrRecommendation;
+
+    severity =
+      category === "viewport"
+        ? "high"
+        : category === "overflow"
+          ? "medium"
+          : category === "images"
+            ? "medium"
+            : "low";
+
+    element = recommendationOrElement;
+    finalDocumentationUrl = elementOrDocumentationUrl;
+  }
+
   return {
     id,
     category,
@@ -189,7 +233,9 @@ function createIssue(
     description,
     recommendation,
     ...(element !== undefined ? { element } : {}),
-    ...(documentationUrl !== undefined ? { documentationUrl } : {}),
+    ...(finalDocumentationUrl !== undefined
+      ? { documentationUrl: finalDocumentationUrl }
+      : {}),
   };
 }
 
@@ -386,10 +432,11 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-viewport-configuration",
         "viewport",
+        "medium",
         "Viewport configuration may be incomplete",
         "The viewport declaration does not clearly include both device-width and a supported initial-scale value.",
         'Review the viewport declaration and normally use content="width=device-width, initial-scale=1".',
-        "<meta name=\"viewport\">",
+        '<meta name="viewport">',
       ),
     );
   }
@@ -401,6 +448,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-image-dimensions",
         "images",
+        "medium",
         "Images missing intrinsic dimensions",
         `${imagesWithoutDimensions} image element(s) lack an explicit width or height attribute.`,
         "Where practical, provide intrinsic width and height attributes and use CSS such as max-width: 100%; height: auto.",
@@ -415,6 +463,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-image-alt",
         "images",
+        "medium",
         "Images missing alt attributes",
         `${imagesWithoutAlt} image element(s) do not declare an alt attribute. This is an accessibility concern rather than a direct measurement of responsiveness.`,
         'Provide descriptive alt text for meaningful images and alt="" for decorative images.',
@@ -469,6 +518,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-iframe",
         "media",
+        "medium",
         "Embedded frames need responsive verification",
         `Found ${iframeTags.length} iframe element(s). Their dimensions and embedded content were not rendered or measured.`,
         "Use a responsive container, set suitable width constraints, and verify the embedded content on mobile.",
@@ -482,6 +532,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-tables",
         "layout",
+        "medium",
         "Tables need narrow-screen verification",
         `Found ${tablesWithoutResponsiveWrapper} table element(s). Static HTML cannot determine whether their containers allow horizontal scrolling.`,
         "Check wide tables on mobile. Consider a dedicated overflow-x container or a more suitable small-screen presentation.",
@@ -497,6 +548,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-no-inline-media-queries",
         "best-practices",
+        "low",
         "No CSS media queries found in supplied HTML",
         "No @media rule was detected in the HTML text. Stylesheets may be external or use other responsive techniques.",
         "Inspect the actual stylesheets before concluding that breakpoints are missing. Add media queries only where the layout requires them.",
@@ -509,6 +561,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-inline-styles",
         "best-practices",
+        "low",
         "Inline styles may limit layout flexibility",
         `Found ${inlineStyleCount} inline style attribute(s). Some inline styles can make responsive adjustments harder to maintain.`,
         "Prefer reusable CSS classes for layout rules and use responsive CSS declarations in stylesheets.",
@@ -523,6 +576,7 @@ export function analyzeResponsiveDesign(
       createIssue(
         "responsive-static-analysis-limitation",
         "best-practices",
+        "low",
         "Static analysis cannot verify the rendered layout",
         "The engine inspected HTML markup only; actual layout, overflow, breakpoints, and touch-target dimensions were not measured.",
         "Use browser-based tests at mobile, tablet, and desktop viewport sizes to validate the layout.",
