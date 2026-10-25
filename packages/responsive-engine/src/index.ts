@@ -395,7 +395,6 @@ export function analyzeResponsiveDesign(
   }
 
   /* Image sizing */
-  
 
   if (imagesWithoutDimensions > 0) {
     issues.push(
