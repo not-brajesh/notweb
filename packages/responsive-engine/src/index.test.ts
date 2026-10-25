@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -70,12 +69,12 @@ describe("Responsive Engine", () => {
       `,
     });
 
-    expect(typeof result.score).toBe("number");
-    expect(result.score).toBeGreaterThanOrEqual(0);
-    expect(result.score).toBeLessThanOrEqual(100);
+    expect(typeof result.score.score).toBe("number");
+    expect(result.score.score).toBeGreaterThanOrEqual(0);
+    expect(result.score.score).toBeLessThanOrEqual(100);
   });
 
-  it("should return a score of 100 when there are no issues", () => {
+  it("should return a valid score object with grade and label", () => {
     const result = analyzeResponsiveDesign({
       html: `
         <html>
@@ -91,7 +90,10 @@ describe("Responsive Engine", () => {
     });
 
     // The score is based on detected issues, so check its valid range.
-    expect(result.score).toBeGreaterThanOrEqual(0);
-    expect(result.score).toBeLessThanOrEqual(100);
+    expect(result.score.score).toBeGreaterThanOrEqual(0);
+    expect(result.score.score).toBeLessThanOrEqual(100);
+    expect(["A", "B", "C", "D", "F"]).toContain(result.score.grade);
+    expect(typeof result.score.label).toBe("string");
+    expect(result.score.label.length).toBeGreaterThan(0);
   });
 });
