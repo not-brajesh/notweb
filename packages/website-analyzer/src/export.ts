@@ -76,6 +76,7 @@ const SCORE_CSV_HEADERS = [
  */
 function neutralizeCsvFormula(value: string): string {
   const normalized = value.replace(
+    // eslint-disable-next-line no-control-regex -- Trim leading control characters and spaces before formula detection.
     /^[\x00-\x20]+/,
     "",
   );
