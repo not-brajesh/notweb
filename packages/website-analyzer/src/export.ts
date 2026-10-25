@@ -1,4 +1,3 @@
-
 /**
  * NOTWEB — Report Export Utilities
  *
@@ -76,9 +75,12 @@ const SCORE_CSV_HEADERS = [
  * apostrophe reduces this risk, although spreadsheet behavior varies.
  */
 function neutralizeCsvFormula(value: string): string {
-  const normalized = value.replace(/^[\u0000-\u0020]+/, "");
+  const normalized = value.replace(
+    /^[\x00-\x20]+/,
+    "",
+  );
 
-  if (/^[=+\-@\t\r]/.test(normalized)) {
+  if (/^[=+\-@]/.test(normalized)) {
     return `'${value}`;
   }
 
@@ -413,4 +415,3 @@ function getSafeExtension(filename: string): string {
 
   return `.${extension.toLowerCase()}`;
 }
-
