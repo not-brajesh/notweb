@@ -1,4 +1,3 @@
-
 /**
  * NOTWEB Throttle Utilities
  *
@@ -113,6 +112,7 @@ export function throttle<TArguments extends unknown[], TResult>(
     const elapsed = hasExecuted ? now - lastExecutionTime : 0;
 
     latestArgs = args;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     latestThis = this;
 
     if (!hasExecuted && !leading) {
