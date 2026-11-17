@@ -285,17 +285,15 @@ NOTWEB aims to make website analysis, responsive optimization, and multi-platfor
 
 
 
+# Data Structure Laboratory (E0054B)
 
+## Experiment 0
 
-Data Structure Laboratory (E0054B)
-
-Experiment 0
-
-Question:
+**Question:**
 Write a C++ program demonstrating basic syntax and object-oriented concepts (classes and objects).
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -313,25 +311,27 @@ int main() {
     s1.showRoll();
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 No input required
+```
 
-
-Output:
-
+**Output:**
+```text
 101
+```
 
+---
 
-Experiment 1(a)
+## Experiment 1(a)
 
-Question:
+**Question:**
 Write a C++ program that prints numbers from 1 to N and analyze its time complexity and space complexity using asymptotic notations.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -348,27 +348,29 @@ int main() {
 
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 5
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter the value of N: 5
 Numbers from 1 to 5 are:
 1 2 3 4 5 
+```
 
+---
 
-Experiment 1(b)
+## Experiment 1(b)
 
-Question:
+**Question:**
 Write a C++ program to implement basic operations on two-dimensional arrays (creation, traversal, insertion, updation, and transpose) and to perform address calculation of array elements using row-major and column-major order formulas.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -445,19 +447,19 @@ int main() {
 
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 1 2 3
 4 5 6
 7 8 9
 1 1 50
 1000 2 1 2
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter 9 elements (row-wise):
 1 2 3
 4 5 6
@@ -481,15 +483,17 @@ Transpose of the matrix:
 
 Enter Base Address, Element Size (W), row (i), column (j): 1000 2 1 2
 Address of A[1][2] = 1010
+```
 
+---
 
-Experiment 2
+## Experiment 2
 
-Question:
+**Question:**
 Write a C++ program to represent a sparse matrix using the triplet (3-tuple) representation and to perform the transpose operation on the sparse matrix.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -570,19 +574,19 @@ int main() {
 
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 4 4
 0 0 3 0
 0 0 0 0
 0 -1 0 0
 4 0 0 0
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter number of rows and columns: 4 4
 Enter matrix elements row-wise:
 0 0 3 0
@@ -603,15 +607,17 @@ Row	Col	Value
 0	3	4
 1	2	-1
 2	0	3
+```
 
+---
 
-Experiment 3(a)
+## Experiment 3(a)
 
-Question:
+**Question:**
 Write a C++ program to implement the Stack Abstract Data Type (ADT) using both array and linked list representations, and to perform basic stack operations such as push, pop, peek, and display.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -711,10 +717,10 @@ int main() {
 
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 1
 10
 1
@@ -730,10 +736,10 @@ Input:
 5
 6
 0
+```
 
-
-Output:
-
+**Output:**
+```text
 1.Push (Array) 2.Pop (Array) 3.Display (Array) 4.Push (Linked) 5.Pop (Linked) 6.Display (Linked) 0.Exit
 Choice: 1
 Enter value: 10
@@ -776,15 +782,17 @@ Stack (top to bottom): 30
 
 1.Push (Array) 2.Pop (Array) 3.Display (Array) 4.Push (Linked) 5.Pop (Linked) 6.Display (Linked) 0.Exit
 Choice: 0
+```
 
+---
 
-Experiment 3(b)
+## Experiment 3(b)
 
-Question:
+**Question:**
 Write a C++ program to implement two stacks using a single array and to perform basic stack operations — push, pop, and peek — on both stacks independently and efficiently.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -862,10 +870,10 @@ int main() {
 
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 5
 1
 10
@@ -882,10 +890,10 @@ Input:
 5
 7
 0
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter size of shared array: 5
 
 1.Push-S1 2.Pop-S1 3.Peek-S1 4.Push-S2 5.Pop-S2 6.Peek-S2 7.Display 0.Exit
@@ -932,15 +940,17 @@ Stack 2 (bottom to top): 50
 
 1.Push-S1 2.Pop-S1 3.Peek-S1 4.Push-S2 5.Pop-S2 6.Peek-S2 7.Display 0.Exit
 Choice: 0
+```
 
+---
 
-Experiment 4(a)
+## Experiment 4(a)
 
-Question:
+**Question:**
 Write a C++ program to convert a given Infix expression into its equivalent Postfix expression using the Stack data structure.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 #include <stack>
 #include <cctype>
@@ -999,26 +1009,28 @@ int main() {
     cout << "Postfix expression: " << infixToPostfix(expr) << endl;
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 A+B*(C-D)
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter infix expression: A+B*(C-D)
 Postfix expression: ABCD-*+
+```
 
+---
 
-Experiment 4(b)
+## Experiment 4(b)
 
-Question:
+**Question:**
 Write a C++ program to evaluate a given Postfix expression and compute its numeric result using the Stack data structure.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 #include <stack>
 #include <sstream>
@@ -1058,26 +1070,28 @@ int main() {
     cout << "Result = " << evaluatePostfix(expr) << endl;
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 6 5 2 3 + 8 * + 3 + *
+```
 
-
-Output:
-
+**Output:**
+```text
 Enter postfix expression (space-separated): 6 5 2 3 + 8 * + 3 + *
 Result = 288
+```
 
+---
 
-Experiment 5
+## Experiment 5
 
-Question:
+**Question:**
 Write a C++ program to implement a Linear Queue using arrays and to perform basic queue operations — Enqueue, Dequeue, and Display.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -1133,30 +1147,32 @@ int main() {
     q.display();
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 No input required
+```
 
-
-Output:
-
+**Output:**
+```text
 10 Enqueued
 20 Enqueued
 30 Enqueued
 Queue: 10 20 30 
 10 Dequeued
 Queue: 20 30 
+```
 
+---
 
-Experiment 6
+## Experiment 6
 
-Question:
+**Question:**
 Write a C++ program to implement two queues using a single array and to perform basic queue operations — Enqueue, Dequeue, and Display — on both queues independently.
 
-Execution Code:
-
+**Execution Code:**
+```cpp
 #include <iostream>
 using namespace std;
 
@@ -1215,15 +1231,15 @@ int main() {
     q.display();
     return 0;
 }
+```
 
-
-Input:
-
+**Input:**
+```text
 No input required
+```
 
-
-Output:
-
+**Output:**
+```text
 10 Enqueued to Queue1
 20 Enqueued to Queue1
 50 Enqueued to Queue2
@@ -1234,3 +1250,4 @@ Queue2: 50 60
 50 Dequeued from Queue2
 Queue1: 20 
 Queue2: 60
+```
